@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from gateway.config import get_settings
 from gateway.metrics import get_metrics_app
@@ -93,3 +95,10 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
         status_code=500,
         content={"error": {"message": "Internal server error", "type": "server_error"}},
     )
+
+
+# Static frontend — mounted last so specific routes (/v1/*, /health, /metrics)
+# take priority. html=True makes Starlette serve index.html for "/".
+_STATIC_DIR = Path(__file__).parent / "static"
+if _STATIC_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=_STATIC_DIR, html=True), name="frontend")
