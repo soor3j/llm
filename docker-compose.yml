@@ -1,0 +1,143 @@
+services:
+
+  # ----------------------------------------------------------------
+  # FastAPI gateway — the only publicly exposed service
+  # ----------------------------------------------------------------
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    image: llm-inference-gateway:latest
+    container_name: llm-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      API_KEY: ${API_KEY}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      ENGINE_HOST: llama-cpp
+      ENGINE_PORT: 8001
+      INFERENCE_BACKEND: llamacpp
+      MODEL_NAME: ${MODEL_NAME:-mistral-7b}
+      CONTEXT_LENGTH: ${CONTEXT_LENGTH:-4096}
+      MAX_TOKENS_DEFAULT: ${MAX_TOKENS_DEFAULT:-512}
+      N_GPU_LAYERS: ${N_GPU_LAYERS:-0}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-3600}
+      CACHE_SIMILARITY_THRESHOLD: ${CACHE_SIMILARITY_THRESHOLD:-0.95}
+      RATE_LIMIT_RPM: ${RATE_LIMIT_RPM:-60}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+    depends_on:
+      llama-cpp:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - inference-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------
+  # llama.cpp inference engine — internal only, never exposed to host
+  # ----------------------------------------------------------------
+  llama-cpp:
+    build:
+      context: ./llama-cpp-server
+      dockerfile: Dockerfile
+    image: llm-llamacpp-engine:latest
+    container_name: llm-engine
+    expose:
+      - "8001"
+    volumes:
+      # Volume mount (Option 1): model lives on host, mounted read-only
+      - "${MODEL_PATH}:/models:ro"
+    environment:
+      MODEL_FILE: /models/${MODEL_FILE:-mistral-7b-instruct-v0.2.Q4_K_M.gguf}
+      CTX_SIZE: ${CONTEXT_LENGTH:-4096}
+      THREADS: ${THREADS:-8}
+      N_GPU_LAYERS: ${N_GPU_LAYERS:-0}
+      HOST: 0.0.0.0
+      PORT: 8001
+    networks:
+      - inference-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30         # Allow up to 5 minutes for model load
+      start_period: 30s
+
+  # ----------------------------------------------------------------
+  # Redis — cache + rate limiting state
+  # ----------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: llm-redis
+    expose:
+      - "6379"
+    networks:
+      - inference-net
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no  # no persistence needed
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ----------------------------------------------------------------
+  # Prometheus — metrics collection
+  # ----------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: llm-prometheus
+    expose:
+      - "9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
+    networks:
+      - inference-net
+    restart: unless-stopped
+    depends_on:
+      - gateway
+
+  # ----------------------------------------------------------------
+  # Grafana — dashboards and alerting
+  # ----------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: llm-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/llm-inference.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    networks:
+      - inference-net
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+networks:
+  inference-net:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:

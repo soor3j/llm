@@ -1,0 +1,51 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Models — never commit large binary files
+*.gguf
+*.bin
+models/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+*.lcov
+coverage.xml
+
+# Linting
+.ruff_cache/
+.mypy_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Docker
+*.log
+
+# Benchmarks output (keep script, ignore results — they're machine-specific)
+benchmarks/results.md
+
+# Claude Code internal directory
+.claude/

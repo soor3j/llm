@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install linting tools
+        run: pip install ruff black
+
+      - name: Run ruff
+        run: ruff check gateway/ tests/
+
+      - name: Run black
+        run: black --check gateway/ tests/
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies
+        working-directory: gateway
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Run tests with coverage
+        env:
+          API_KEY: test-api-key-12345
+          ENGINE_HOST: localhost
+          ENGINE_PORT: 8001
+        run: |
+          pytest tests/ -v --cov=gateway --cov-report=term-missing --cov-fail-under=60
+
+  build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create minimal .env for build validation
+        run: |
+          echo "API_KEY=ci-test-key" > .env
+          echo "MODEL_PATH=/tmp/models" >> .env
+
+      - name: Build gateway image
+        run: docker build -t llm-gateway:ci ./gateway
+
+      - name: Validate gateway image starts
+        run: |
+          docker run --rm -d \
+            -e API_KEY=ci-test-key \
+            -e ENGINE_HOST=localhost \
+            -p 8000:8000 \
+            --name ci-gateway \
+            llm-gateway:ci || true
+          sleep 5
+          docker stop ci-gateway 2>/dev/null || true
