@@ -8,7 +8,8 @@ WORKDIR /build
 # Install uv
 RUN pip install --no-cache-dir uv
 
-COPY pyproject.toml .
+# Build context is repo root — pyproject.toml is in gateway/
+COPY gateway/pyproject.toml .
 RUN uv pip install --system --no-cache -r pyproject.toml 2>/dev/null || \
     uv pip install --system --no-cache \
         fastapi \
@@ -36,8 +37,13 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application source
-COPY . .
+# Copy gateway package as a proper subdirectory so imports work:
+# from gateway.config import ... → /app/gateway/config.py ✓
+COPY gateway/ ./gateway/
+
+ENV HF_HOME=/tmp/huggingface
+ENV TRANSFORMERS_CACHE=/tmp/huggingface
+ENV HOME=/tmp
 
 USER appuser
 

@@ -5,8 +5,8 @@ services:
   # ----------------------------------------------------------------
   gateway:
     build:
-      context: ./gateway
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./gateway/Dockerfile
     image: llm-inference-gateway:latest
     container_name: llm-gateway
     ports:
@@ -97,8 +97,8 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: llm-prometheus
-    expose:
-      - "9090"
+    ports:
+      - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus

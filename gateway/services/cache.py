@@ -1,3 +1,4 @@
+import base64
 import json
 import time
 
@@ -55,10 +56,10 @@ class SemanticCache:
             best_id = None
 
             for entry_id in entry_ids:
-                emb_bytes = await self._redis.get(f"{_EMBEDDING_KEY_PREFIX}{entry_id}")
-                if emb_bytes is None:
+                emb_b64 = await self._redis.get(f"{_EMBEDDING_KEY_PREFIX}{entry_id}")
+                if emb_b64 is None:
                     continue
-                cached_emb = np.frombuffer(emb_bytes, dtype=np.float32)
+                cached_emb = np.frombuffer(base64.b64decode(emb_b64), dtype=np.float32)
                 score = self._cosine_similarity(query_emb.astype(np.float32), cached_emb)
                 if score > best_score:
                     best_score = score
@@ -82,7 +83,7 @@ class SemanticCache:
         pipe = self._redis.pipeline()
         pipe.set(
             f"{_EMBEDDING_KEY_PREFIX}{entry_id}",
-            emb.tobytes(),
+            base64.b64encode(emb.tobytes()).decode("ascii"),
             ex=self._settings.cache_ttl_seconds,
         )
         pipe.set(
