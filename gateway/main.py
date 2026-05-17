@@ -8,8 +8,9 @@ from fastapi.staticfiles import StaticFiles
 
 from gateway.config import get_settings
 from gateway.metrics import get_metrics_app
-from gateway.routers import chat, health, models
+from gateway.routers import admin, auth, chat, health, metrics_summary, models
 from gateway.services.engine import LlamaCppClient
+from gateway.services.queue_tracker import QueueTracker
 
 log = structlog.get_logger()
 
@@ -45,12 +46,19 @@ async def lifespan(app: FastAPI):
     )
     app.state.inference_backend = settings.inference_backend
 
-    # Redis client (optional — rate limiting + caching)
+    # In-memory queue tracker — always available, no external deps.
+    app.state.queue_tracker = QueueTracker()
+
+    # Redis client (optional — rate limiting, caching, users, log capture)
     app.state.redis_client = None
     app.state.cache = None
+    app.state.users = None
+    app.state.request_log = None
     try:
         import redis.asyncio as aioredis
         from gateway.services.cache import SemanticCache
+        from gateway.services.request_log import RequestLog
+        from gateway.services.users import UserRegistry
 
         r = aioredis.Redis(
             host=settings.redis_host,
@@ -60,9 +68,11 @@ async def lifespan(app: FastAPI):
         await r.ping()
         app.state.redis_client = r
         app.state.cache = await SemanticCache.create(r, settings)
+        app.state.users = UserRegistry(r)
+        app.state.request_log = RequestLog(r)
         log.info("redis_connected", host=settings.redis_host, port=settings.redis_port)
     except Exception as exc:
-        log.warning("redis_unavailable", error=str(exc), detail="Running without cache and rate limiting")
+        log.warning("redis_unavailable", error=str(exc), detail="Running without cache, users, log capture")
 
     log.info("server_ready", port=8000)
     yield
@@ -86,6 +96,9 @@ app.mount("/metrics", get_metrics_app())
 app.include_router(health.router)
 app.include_router(chat.router, prefix="/v1")
 app.include_router(models.router, prefix="/v1")
+app.include_router(auth.router, prefix="/v1")
+app.include_router(metrics_summary.router, prefix="/v1")
+app.include_router(admin.router, prefix="/admin")
 
 
 @app.exception_handler(Exception)

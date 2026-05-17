@@ -37,6 +37,45 @@ log = structlog.get_logger()
 router = APIRouter(dependencies=[Depends(verify_api_key), Depends(check_rate_limit)])
 
 
+async def _finalize(
+    app_state,
+    *,
+    trace_id: str,
+    model: str,
+    status_code: int,
+    tokens: int,
+    latency_ms: int,
+    message: str,
+    api_key_prefix: str | None = None,
+) -> None:
+    """Push completion to the queue tracker and a row to the request log.
+
+    Always swallows internal errors — observability must not break the
+    user-facing response.
+    """
+    tracker = getattr(app_state, "queue_tracker", None)
+    if tracker is not None:
+        try:
+            tracker.complete(trace_id, status_code, tokens)
+        except Exception:
+            pass
+
+    rl = getattr(app_state, "request_log", None)
+    if rl is not None:
+        try:
+            await rl.record(
+                status=status_code,
+                latency_ms=latency_ms,
+                model=model,
+                trace_id=trace_id,
+                message=message,
+                level="info" if status_code < 400 else "error",
+                api_key_prefix=api_key_prefix,
+            )
+        except Exception:
+            pass
+
+
 @router.post("/chat/completions", response_model=None)
 async def chat_completions(
     request_body: ChatCompletionRequest,
@@ -46,14 +85,25 @@ async def chat_completions(
 ):
     engine = request.app.state.engine_client
     cache = getattr(request.app.state, "cache", None)
+    tracker = getattr(request.app.state, "queue_tracker", None)
     model = request_body.model
     max_tokens = request_body.max_tokens or settings.max_tokens_default
     start_time = time.perf_counter()
     request_id = f"chatcmpl-{uuid.uuid4().hex[:8]}"
 
+    # Mark this request as in-flight in the queue tracker.
+    if tracker is not None:
+        try:
+            tracker.start(request_id, model)
+        except Exception:
+            pass
+
     if request_body.stream:
         return StreamingResponse(
-            _stream_response(engine, request_body, request_id, model, max_tokens, start_time),
+            _stream_response(
+                engine, request_body, request_id, model, max_tokens,
+                start_time, request.app.state, api_key,
+            ),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
@@ -66,6 +116,14 @@ async def chat_completions(
                 cache_hits_total.labels(model=model).inc()
                 requests_total.labels(model=model, status_code=200).inc()
                 log.info("cache_hit", model=model, api_key_prefix=api_key[:8])
+                await _finalize(
+                    request.app.state,
+                    trace_id=request_id, model=model, status_code=200,
+                    tokens=0,
+                    latency_ms=int((time.perf_counter() - start_time) * 1000),
+                    message="chat.completions · cache hit",
+                    api_key_prefix=api_key[:8],
+                )
                 return ChatCompletionResponse(**cached)
 
         raw = await engine.generate(
@@ -108,12 +166,27 @@ async def chat_completions(
             latency_ms=round(elapsed * 1000, 1),
             api_key_prefix=api_key[:8],
         )
+        await _finalize(
+            request.app.state,
+            trace_id=request_id, model=model, status_code=200,
+            tokens=completion_tokens,
+            latency_ms=int(elapsed * 1000),
+            message="chat.completions",
+            api_key_prefix=api_key[:8],
+        )
         return response
 
     except httpx.HTTPError as exc:
         errors_total.labels(error_type="EngineConnectionError").inc()
         requests_total.labels(model=model, status_code=502).inc()
         log.error("engine_connection_error", error=str(exc), model=model)
+        await _finalize(
+            request.app.state,
+            trace_id=request_id, model=model, status_code=502, tokens=0,
+            latency_ms=int((time.perf_counter() - start_time) * 1000),
+            message=f"engine error: {exc}",
+            api_key_prefix=api_key[:8],
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail={"message": "Inference engine unavailable", "type": "engine_error"},
@@ -122,6 +195,13 @@ async def chat_completions(
         errors_total.labels(error_type=type(exc).__name__).inc()
         requests_total.labels(model=model, status_code=500).inc()
         log.error("inference_error", error=str(exc), model=model)
+        await _finalize(
+            request.app.state,
+            trace_id=request_id, model=model, status_code=500, tokens=0,
+            latency_ms=int((time.perf_counter() - start_time) * 1000),
+            message=f"inference error: {exc}",
+            api_key_prefix=api_key[:8],
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"message": "Internal server error", "type": "inference_error"},
@@ -135,9 +215,13 @@ async def _stream_response(
     model: str,
     max_tokens: int,
     start_time: float,
+    app_state=None,
+    api_key: str = "",
 ) -> AsyncGenerator[str, None]:
     first_token = True
     token_count = 0
+    final_status = 200
+    final_message = "chat.completions · stream"
 
     # Opening role delta
     opening = ChatCompletionChunk(
@@ -169,14 +253,25 @@ async def _stream_response(
     except Exception as exc:
         errors_total.labels(error_type=type(exc).__name__).inc()
         log.error("stream_error", error=str(exc), model=model)
+        final_status = 500
+        final_message = f"stream error: {exc}"
 
     finally:
         elapsed = time.perf_counter() - start_time
         if elapsed > 0 and token_count > 0:
             tokens_per_second.labels(model=model).set(token_count / elapsed)
         tokens_generated_total.labels(model=model).inc(token_count)
-        requests_total.labels(model=model, status_code=200).inc()
+        requests_total.labels(model=model, status_code=final_status).inc()
         request_duration_seconds.labels(endpoint="/v1/chat/completions/stream").observe(elapsed)
+        if app_state is not None:
+            await _finalize(
+                app_state,
+                trace_id=request_id, model=model, status_code=final_status,
+                tokens=token_count,
+                latency_ms=int(elapsed * 1000),
+                message=final_message,
+                api_key_prefix=(api_key[:8] if api_key else None),
+            )
 
     # Stop chunk + done sentinel
     stop_chunk = ChatCompletionChunk(

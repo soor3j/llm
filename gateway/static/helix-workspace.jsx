@@ -198,16 +198,41 @@ const useTicker = (interval = 1200) => {
   return t;
 };
 
+// Hook: poll /v1/metrics/summary every 2s while mounted.
+const useMetricsSummary = (intervalMs = 2000) => {
+  const [data, setData] = React.useState(null);
+  const [err, setErr] = React.useState(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const r = await fetch(`${apiBase()}/metrics/summary`, {
+          headers: { Authorization: `Bearer ${getApiKey()}` },
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const j = await r.json();
+        if (!cancelled) { setData(j); setErr(null); }
+      } catch (e) {
+        if (!cancelled) setErr(e.message);
+      }
+    };
+    tick();
+    const id = setInterval(tick, intervalMs);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [intervalMs]);
+  return [data, err];
+};
+
 const MetricsRail = ({ collapsed, onToggle }) => {
-  const t = useTicker(1400);
-  const drift = (a, amp) => a + Math.round(Math.sin(t * 0.4 + amp) * amp);
+  const [summary] = useMetricsSummary(2000);
+  const fmt = (v, fallback = '—') => (v == null ? fallback : v);
   const metrics = [
-    { label: 'TTFT', value: drift(218, 12), unit: 'ms' },
-    { label: 'Tokens/sec', value: drift(62, 4), unit: '' },
-    { label: 'Memory', value: '38.2', unit: 'GB' },
-    { label: 'Queue depth', value: Math.max(0, 3 + Math.round(Math.sin(t * 0.7) * 3)), unit: '' },
-    { label: 'Cache hit', value: 74 + Math.round(Math.sin(t * 0.3) * 4), unit: '%' },
-    { label: 'GPU', value: 67 + Math.round(Math.sin(t * 0.5) * 6), unit: '%' },
+    { label: 'TTFT',        value: summary ? fmt(summary.ttft_mean_ms) : '—',          unit: 'ms' },
+    { label: 'Tokens/sec',  value: summary ? fmt(summary.tokens_per_sec) : '—',         unit: '' },
+    { label: 'Memory',      value: summary ? fmt(summary.memory_mb) : '—',              unit: 'MB' },
+    { label: 'Queue depth', value: summary ? fmt(summary.in_flight) : '—',              unit: '' },
+    { label: 'Cache hit',   value: summary ? Math.round((summary.cache_hit_rate ?? 0) * 100) : '—', unit: '%' },
+    { label: 'Requests',    value: summary ? fmt(summary.total_requests) : '—',         unit: '' },
   ];
   if (collapsed) {
     return (
@@ -235,14 +260,16 @@ const MetricsRail = ({ collapsed, onToggle }) => {
               {m.unit && <span className="unit">{m.unit}</span>}
             </div>
           </div>
-          <Sparkline seed={`${m.label}-${t}-${i}`} />
+          <Sparkline seed={`${m.label}-${summary?.uptime_sec || 0}-${i}`} />
         </div>
       ))}
       <div className="ws-rail-foot">
         <div className="ws-rail-foot-row">
           <span className="ws-dot on" /> Engine healthy
         </div>
-        <div className="ws-rail-foot-row mono small">trace · 7a4f…b2c1</div>
+        <div className="ws-rail-foot-row mono small">
+          uptime · {summary?.uptime_sec ? `${Math.floor(summary.uptime_sec / 60)}m` : '—'}
+        </div>
       </div>
     </aside>
   );
@@ -616,25 +643,31 @@ const HistoryView = () => (
 );
 
 const MetricsView = () => {
-  const t = useTicker(1500);
+  const [summary, err] = useMetricsSummary(2000);
   const cards = [
-    { label: 'Tokens / second', value: 62 + Math.round(Math.sin(t * 0.5) * 4), spark: 'tps' },
-    { label: 'Time to first token', value: '218', unit: 'ms', spark: 'ttft' },
-    { label: 'Requests / minute', value: 142 + Math.round(Math.sin(t * 0.3) * 8), spark: 'rpm' },
-    { label: 'Cache hit rate', value: 74 + Math.round(Math.sin(t * 0.4) * 3), unit: '%', spark: 'cache' },
+    { label: 'Tokens / second',     value: summary?.tokens_per_sec ?? '—',                                  spark: 'tps' },
+    { label: 'Time to first token', value: summary?.ttft_mean_ms ?? '—', unit: 'ms',                       spark: 'ttft' },
+    { label: 'Requests / minute',   value: summary?.requests_per_min ?? '—',                                spark: 'rpm' },
+    { label: 'Cache hit rate',      value: summary ? Math.round((summary.cache_hit_rate ?? 0) * 100) : '—', unit: '%', spark: 'cache' },
+    { label: 'Total requests',      value: summary?.total_requests ?? '—',                                  spark: 'total' },
+    { label: 'Errors',              value: summary?.errors ?? '—',                                          spark: 'err' },
   ];
   return (
     <section className="ws-view">
       <div className="ws-view-head">
         <h2>Metrics</h2>
-        <p>Last 60 minutes · scraped every 10 seconds.</p>
+        <p>
+          {err
+            ? <span style={{ color: 'oklch(0.78 0.16 25)' }}>Could not reach /v1/metrics/summary: {err}</span>
+            : 'Live values from the FastAPI gateway, refreshed every 2 seconds.'}
+        </p>
       </div>
       <div className="ws-metric-grid">
         {cards.map((c) => (
           <div className="ws-metric-card" key={c.label}>
             <div className="ws-metric-card-label">{c.label}</div>
             <div className="ws-metric-card-val">{c.value}{c.unit && <span className="unit">{c.unit}</span>}</div>
-            <Sparkline seed={c.spark + t} w={220} h={48} />
+            <Sparkline seed={c.spark + (summary?.uptime_sec || 0)} w={220} h={48} />
           </div>
         ))}
       </div>

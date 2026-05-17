@@ -42,20 +42,91 @@ const LoginPanel = ({ progress, onAuth }) => {
 
   const [mode, setMode] = React.useState('user'); // 'user' | 'admin'
   const isAdmin = mode === 'admin';
+  const [errorMsg, setErrorMsg] = React.useState(null);
+  const [busy, setBusy] = React.useState(false);
   const idRef = React.useRef(null);
   const pwRef = React.useRef(null);
 
-  // Cosmetic login: store the typed password as the Bearer token.
-  // Backend expects a static API_KEY env var, so whatever the user types
-  // becomes the Authorization: Bearer <token> for subsequent requests.
-  const handleSubmit = (e) => {
-    e?.preventDefault?.();
-    const key = pwRef.current?.value || '';
+  // Submission flow:
+  //   Admin tab  → cosmetic: store typed password as adminApiKey.
+  //   User tab + Login    → POST /v1/auth/login. On 200 store returned api_key.
+  //                         On 401/registry-unavailable fall back to cosmetic
+  //                         (the user might have typed the raw API_KEY value).
+  //   User tab + Register → POST /v1/auth/register. On 201 store returned key.
+  //                         On error surface a clear message.
+  const apiPost = async (path, body) => {
+    const res = await fetch(`${window.location.origin}/v1${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    let payload = null;
+    try { payload = await res.json(); } catch {}
+    return { ok: res.ok, status: res.status, payload };
+  };
+
+  const cosmeticStore = (token) => {
     try {
-      if (isAdmin) localStorage.setItem('adminApiKey', key);
-      else         localStorage.setItem('apiKey', key);
+      if (isAdmin) localStorage.setItem('adminApiKey', token);
+      else         localStorage.setItem('apiKey', token);
     } catch {}
-    onAuth?.(mode);
+  };
+
+  const handleSubmit = async (action = 'login', e) => {
+    e?.preventDefault?.();
+    setErrorMsg(null);
+    if (busy) return;
+
+    const id = idRef.current?.value?.trim() || '';
+    const pw = pwRef.current?.value || '';
+    if (!pw) { setErrorMsg('Password is required'); return; }
+
+    // Admin tab — cosmetic flow only (no admin registration UX).
+    if (isAdmin) {
+      cosmeticStore(pw);
+      onAuth?.('admin');
+      return;
+    }
+
+    setBusy(true);
+    try {
+      if (action === 'register') {
+        if (!id) { setErrorMsg('Email is required'); return; }
+        const { ok, status, payload } = await apiPost('/auth/register', { email: id, password: pw });
+        if (ok) {
+          cosmeticStore(payload.api_key);
+          try { localStorage.setItem('userEmail', payload.email); } catch {}
+          onAuth?.('user');
+          return;
+        }
+        if (status === 409) { setErrorMsg('Email already registered — try Login.'); return; }
+        if (status === 503) { setErrorMsg('Registry unavailable (Redis down). Login with API_KEY directly.'); return; }
+        setErrorMsg(payload?.detail?.message || `Register failed (${status})`);
+        return;
+      }
+
+      // action === 'login'
+      const { ok, status, payload } = await apiPost('/auth/login', { email: id || 'unknown@local', password: pw });
+      if (ok) {
+        cosmeticStore(payload.api_key);
+        try { localStorage.setItem('userEmail', payload.email); } catch {}
+        onAuth?.('user');
+        return;
+      }
+      // Fall back to cosmetic if the typed password is actually the raw API_KEY value.
+      if (status === 401 || status === 503) {
+        cosmeticStore(pw);
+        onAuth?.('user');
+        return;
+      }
+      setErrorMsg(payload?.detail?.message || `Login failed (${status})`);
+    } catch (err) {
+      // Network failure — fall back to cosmetic so the demo still works offline.
+      cosmeticStore(pw);
+      onAuth?.('user');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -100,10 +171,10 @@ const LoginPanel = ({ progress, onAuth }) => {
         <p className="login-desc">
           {isAdmin
             ? 'Paste your ADMIN_API_KEY (or API_KEY if unset)'
-            : 'Paste your API_KEY value to authenticate'}
+            : 'Register a new account, or login. (Pasting your API_KEY value also works.)'}
         </p>
 
-        <form className="login-form" onSubmit={handleSubmit}>
+        <form className="login-form" onSubmit={(e) => handleSubmit('login', e)}>
           <div className="login-field">
             <input
               ref={idRef}
@@ -117,19 +188,36 @@ const LoginPanel = ({ progress, onAuth }) => {
             <input
               ref={pwRef}
               type="password"
-              placeholder={isAdmin ? 'ADMIN_API_KEY from .env' : 'API_KEY from .env'}
-              autoComplete="current-password"
+              placeholder={isAdmin ? 'ADMIN_API_KEY value' : 'Password'}
+              autoComplete={isAdmin ? 'current-password' : 'new-password'}
             />
           </div>
 
+          {errorMsg && (
+            <div style={{
+              marginTop: 8,
+              padding: '8px 12px',
+              borderRadius: 8,
+              background: 'oklch(0.62 0.16 25 / 0.12)',
+              border: '1px solid oklch(0.62 0.16 25 / 0.3)',
+              color: 'oklch(0.85 0.13 25)',
+              fontSize: 12.5,
+            }}>{errorMsg}</div>
+          )}
+
           {isAdmin ? (
-            <button type="submit" className="login-submit primary">
-              Admin Login
+            <button type="submit" className="login-submit primary" disabled={busy}>
+              {busy ? 'Signing in…' : 'Admin Login'}
             </button>
           ) : (
             <div className="login-actions">
-              <button type="submit" className="login-submit primary">Login</button>
-              <button type="button" className="login-submit ghost" onClick={handleSubmit}>Register</button>
+              <button type="submit" className="login-submit primary" disabled={busy}>
+                {busy ? '…' : 'Login'}
+              </button>
+              <button type="button" className="login-submit ghost" disabled={busy}
+                      onClick={(e) => handleSubmit('register', e)}>
+                {busy ? '…' : 'Register'}
+              </button>
             </div>
           )}
         </form>

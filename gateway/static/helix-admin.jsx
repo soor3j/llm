@@ -3,6 +3,44 @@
 // generated demo data — Phase 2 wires real endpoints (users registry,
 // queue tracker, log capture).
 
+// Helpers for talking to /admin/* with the admin Bearer token.
+const adminKey = () => {
+  try { return localStorage.getItem('adminApiKey') || ''; } catch { return ''; }
+};
+const adminFetch = async (path, init = {}) => {
+  const res = await fetch(`${window.location.origin}${path}`, {
+    ...init,
+    headers: {
+      ...(init.headers || {}),
+      Authorization: `Bearer ${adminKey()}`,
+      ...(init.method && init.method !== 'GET' ? { 'Content-Type': 'application/json' } : {}),
+    },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+};
+
+// Hook: poll an admin endpoint on an interval, return [data, error].
+const useAdminPoll = (path, intervalMs = 2500) => {
+  const [data, setData] = React.useState(null);
+  const [err, setErr] = React.useState(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const j = await adminFetch(path);
+        if (!cancelled) { setData(j); setErr(null); }
+      } catch (e) {
+        if (!cancelled) setErr(e.message);
+      }
+    };
+    tick();
+    const id = setInterval(tick, intervalMs);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [path, intervalMs]);
+  return [data, err];
+};
+
 const ADMIN_SECTIONS = [
   { id: 'overview', label: 'Overview' },
   { id: 'users',    label: 'Users' },
@@ -56,21 +94,25 @@ const AdminTopBar = ({ active, setActive, onSignOut }) => (
 // --- Overview ------------------------------------------------------
 
 const OverviewSection = () => {
-  const t = useTicker(1300);
-  const drift = (base, amp) => base + Math.round(Math.sin(t * 0.4 + amp) * amp);
+  const [s, err] = useAdminPoll('/admin/metrics/summary', 2000);
+  const fmt = (v, suffix = '') => (v == null ? '—' : `${v}${suffix}`);
   const cards = [
-    { label: 'Requests / min', value: drift(1280, 80), trend: '+4.2%', spark: 'rpm' },
-    { label: 'Active users',   value: drift(184, 12),  trend: '+2',    spark: 'au' },
-    { label: 'Cache hit rate', value: `${drift(74, 4)}%`, trend: '+1.1pt', spark: 'cache' },
-    { label: 'Tokens / second',value: drift(620, 40), trend: '+6.8%', spark: 'tps' },
-    { label: 'Queue depth',    value: Math.max(0, drift(4, 4)),  trend: 'stable', spark: 'q' },
-    { label: 'Error rate',     value: '0.04%', trend: '-0.01pt', spark: 'err' },
+    { label: 'Requests / min',  value: fmt(s?.requests_per_min),                                      trend: `${s?.total_requests ?? 0} total`,  spark: 'rpm' },
+    { label: 'In flight',        value: fmt(s?.in_flight),                                             trend: 'live',                              spark: 'au' },
+    { label: 'Cache hit rate',   value: s ? `${Math.round((s.cache_hit_rate ?? 0) * 100)}%` : '—',     trend: `${s?.cache_hits ?? 0} / ${(s?.cache_hits ?? 0) + (s?.cache_misses ?? 0)}`, spark: 'cache' },
+    { label: 'Tokens / second',  value: fmt(s?.tokens_per_sec),                                        trend: `${s?.tokens_total ?? 0} total`,     spark: 'tps' },
+    { label: 'TTFT (mean)',      value: fmt(s?.ttft_mean_ms, 'ms'),                                    trend: 'mean',                              spark: 'ttft' },
+    { label: 'Error rate',       value: s ? `${(s.error_rate * 100).toFixed(2)}%` : '—',               trend: `${s?.errors ?? 0} total`,           spark: 'err' },
   ];
   return (
     <div className="adm-section">
       <div className="ws-view-head">
         <h2>Overview</h2>
-        <p>Cluster-wide signal · refreshing every 10 seconds.</p>
+        <p>
+          {err
+            ? <span style={{ color: 'oklch(0.78 0.16 25)' }}>Could not reach /admin/metrics/summary: {err} — check ADMIN_API_KEY.</span>
+            : 'Live values from the FastAPI gateway · refreshing every 2 seconds.'}
+        </p>
       </div>
       <div className="adm-overview-grid">
         {cards.map((c, i) => (
@@ -89,36 +131,57 @@ const OverviewSection = () => {
         <div className="adm-panel">
           <div className="adm-panel-head">
             <h3>Tokens / second · last hour</h3>
-            <span className="mono small">{drift(620, 40)} tps</span>
+            <span className="mono small">{s?.tokens_per_sec ?? '—'} tps</span>
           </div>
           <div className="adm-bigchart">
-            <BigSparkline seed={`tps-${t}`} stroke="rgba(242,242,245,0.85)" />
+            <BigSparkline seed={`tps-${s?.uptime_sec || 0}`} stroke="rgba(242,242,245,0.85)" />
           </div>
         </div>
-        <div className="adm-panel">
-          <div className="adm-panel-head">
-            <h3>Top tenants</h3>
-            <span className="mono small">by tok/min</span>
+        <RecentActivityPanel />
+      </div>
+    </div>
+  );
+};
+
+// Replaces the multi-tenant breakdown with a single-node activity feed
+// driven by /admin/queue snapshots — what's actually happening on this box.
+const RecentActivityPanel = () => {
+  const [data, err] = useAdminPoll('/admin/queue', 2500);
+  const inflight = data?.inflight || [];
+  const recent = (data?.recent || []).slice().reverse();
+  const fmtAge = (sec) => sec < 60 ? `${Math.round(sec)}s ago` : `${Math.round(sec / 60)}m ago`;
+  return (
+    <div className="adm-panel">
+      <div className="adm-panel-head">
+        <h3>Recent activity</h3>
+        <span className="mono small">{data?.in_flight ?? 0} in flight</span>
+      </div>
+      {err && <div style={{ color: 'oklch(0.78 0.16 25)', fontSize: 12, marginBottom: 8 }}>{err}</div>}
+      {inflight.length === 0 && recent.length === 0 && (
+        <div style={{ color: 'rgba(242,242,245,0.45)', fontSize: 13 }}>No requests yet — send one from the workspace.</div>
+      )}
+      <div className="adm-tenants">
+        {inflight.map((r) => (
+          <div className="adm-tenant" key={`if-${r.trace_id}`}>
+            <div className="adm-tenant-name mono small">{r.trace_id.slice(-8)}</div>
+            <div className="adm-tenant-bar">
+              <div className="adm-tenant-fill"
+                style={{ width: `${Math.min(100, (r.elapsed_ms || 0) / 50)}%`,
+                         background: 'oklch(0.78 0.13 80 / 0.6)' }} />
+            </div>
+            <div className="adm-tenant-val mono small">in flight · {r.elapsed_ms}ms</div>
           </div>
-          <div className="adm-tenants">
-            {[
-              { name: 'acme-prod',    pct: 0.34, t: 8420 },
-              { name: 'globex-eu',    pct: 0.22, t: 5448 },
-              { name: 'initech-app',  pct: 0.16, t: 3963 },
-              { name: 'umbrella-dev', pct: 0.11, t: 2724 },
-              { name: 'soylent-batch',pct: 0.07, t: 1734 },
-              { name: 'others',       pct: 0.10, t: 2477 },
-            ].map((row) => (
-              <div className="adm-tenant" key={row.name}>
-                <div className="adm-tenant-name">{row.name}</div>
-                <div className="adm-tenant-bar">
-                  <div className="adm-tenant-fill" style={{ width: `${row.pct * 100}%` }} />
-                </div>
-                <div className="adm-tenant-val mono small">{fmtNum(row.t)}</div>
-              </div>
-            ))}
+        ))}
+        {recent.map((r) => (
+          <div className="adm-tenant" key={`c-${r.trace_id}-${r.ended_at}`}>
+            <div className="adm-tenant-name mono small">{r.trace_id.slice(-8)}</div>
+            <div className="adm-tenant-bar">
+              <div className="adm-tenant-fill"
+                style={{ width: `${Math.min(100, (r.latency_ms || 0) / 50)}%` }} />
+            </div>
+            <div className="adm-tenant-val mono small">{r.latency_ms}ms · {r.status}</div>
           </div>
-        </div>
+        ))}
       </div>
     </div>
   );
@@ -156,110 +219,120 @@ const BigSparkline = ({ seed, stroke }) => {
 
 // --- Users ---------------------------------------------------------
 
-const USERS = [
-  { name: 'Ada Lovelace',   email: 'ada@acme.com',    role: 'Admin',     keys: 4, last: 'now',     tenant: 'acme-prod' },
-  { name: 'Grace Hopper',   email: 'grace@globex.io', role: 'Developer', keys: 2, last: '2m',      tenant: 'globex-eu' },
-  { name: 'Linus Torvalds', email: 'linus@initech.app',role: 'Developer',keys: 3, last: '14m',     tenant: 'initech-app' },
-  { name: 'Margaret Hamilton', email: 'mh@umbrella.dev', role: 'Operator', keys: 1, last: '1h',  tenant: 'umbrella-dev' },
-  { name: 'Donald Knuth',   email: 'dk@soylent.dev',   role: 'Developer', keys: 2, last: '3h',     tenant: 'soylent-batch' },
-  { name: 'Barbara Liskov', email: 'bl@research.com',  role: 'Read-only', keys: 0, last: 'Yesterday', tenant: 'research-ro' },
-];
-
-const UsersSection = () => (
-  <div className="adm-section">
-    <div className="ws-view-head">
-      <h2>Users</h2>
-      <p>{USERS.length} accounts across 6 tenants.</p>
-    </div>
-    <div className="ws-table">
-      <div className="ws-tr head adm-users-row">
-        <span>Name</span>
-        <span>Tenant</span>
-        <span>Role</span>
-        <span>API keys</span>
-        <span>Last active</span>
+const UsersSection = () => {
+  const [data, err] = useAdminPoll('/admin/users', 5000);
+  const users = data?.users || [];
+  const ageStr = (ts) => {
+    if (!ts) return '—';
+    const sec = Math.floor(Date.now() / 1000 - ts);
+    if (sec < 60) return `${sec}s ago`;
+    if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+    if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+    return `${Math.floor(sec / 86400)}d ago`;
+  };
+  return (
+    <div className="adm-section">
+      <div className="ws-view-head">
+        <h2>Users</h2>
+        <p>
+          {err
+            ? <span style={{ color: 'oklch(0.78 0.16 25)' }}>Could not reach /admin/users: {err}</span>
+            : `${users.length} registered account${users.length === 1 ? '' : 's'} on this server.`}
+        </p>
       </div>
-      {USERS.map((u) => (
-        <div className="ws-tr adm-users-row" key={u.email}>
-          <span className="ws-tr-model">
-            <strong>{u.name}</strong>
-            <small className="mono">{u.email}</small>
-          </span>
-          <span className="mono">{u.tenant}</span>
-          <span>
-            <span className={`adm-role ${u.role.toLowerCase().replace(/[^a-z]/g, '')}`}>{u.role}</span>
-          </span>
-          <span className="mono">{u.keys}</span>
-          <span className="mono small" style={{ color: 'rgba(242,242,245,0.5)' }}>{u.last}</span>
+      {users.length === 0 && !err && (
+        <div style={{ padding: '24px', textAlign: 'center', color: 'rgba(242,242,245,0.5)', fontSize: 14, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14 }}>
+          No users registered yet. Register one from the login screen.
         </div>
-      ))}
+      )}
+      {users.length > 0 && (
+        <div className="ws-table">
+          <div className="ws-tr head adm-users-row">
+            <span>Email</span>
+            <span>API key</span>
+            <span>Role</span>
+            <span>Created</span>
+            <span>Last active</span>
+          </div>
+          {users.map((u) => (
+            <div className="ws-tr adm-users-row" key={u.email}>
+              <span className="ws-tr-model">
+                <strong>{u.email}</strong>
+              </span>
+              <span className="mono small">{u.api_key_masked}</span>
+              <span>
+                <span className={`adm-role ${u.role}`}>{u.role}</span>
+              </span>
+              <span className="mono small" style={{ color: 'rgba(242,242,245,0.5)' }}>{ageStr(u.created_at)}</span>
+              <span className="mono small" style={{ color: 'rgba(242,242,245,0.5)' }}>{ageStr(u.last_active)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 // --- Queue ---------------------------------------------------------
 
 const QueueSection = () => {
-  const t = useTicker(900);
-  const workers = [
-    { id: 'w-01', model: 'llama-3.1-70b', state: 'busy',  reqs: 14, util: 0.92 },
-    { id: 'w-02', model: 'llama-3.1-70b', state: 'busy',  reqs: 12, util: 0.88 },
-    { id: 'w-03', model: 'mistral-7b',    state: 'busy',  reqs: 22, util: 0.74 },
-    { id: 'w-04', model: 'phi-3.5-mini',  state: 'idle',  reqs: 0,  util: 0.04 },
-    { id: 'w-05', model: 'qwen-2.5-32b',  state: 'cold',  reqs: 0,  util: 0 },
-  ];
-  const waiting = Math.max(0, 4 + Math.round(Math.sin(t * 0.7) * 3));
+  const [data, err] = useAdminPoll('/admin/queue', 1500);
+  const inFlight = data?.in_flight ?? 0;
+  const recent = data?.recent || [];
+  const p50 = data?.latency_p50_ms;
+  const p95 = data?.latency_p95_ms;
+  // This stack runs a single llama.cpp engine — represent it as one worker
+  // whose state reflects whether anything is currently being processed.
+  const engineState = inFlight > 0 ? 'busy' : (recent.length > 0 ? 'idle' : 'cold');
   return (
     <div className="adm-section">
       <div className="ws-view-head">
         <h2>Queue</h2>
-        <p>Priority queue across the inference fleet.</p>
+        <p>
+          {err
+            ? <span style={{ color: 'oklch(0.78 0.16 25)' }}>Could not reach /admin/queue: {err}</span>
+            : 'Request queue and in-flight tracker for the single-node llama.cpp engine.'}
+        </p>
       </div>
       <div className="adm-overview-grid three">
         <div className="adm-card">
-          <div className="adm-card-label">Queue depth</div>
-          <div className="adm-card-val">{waiting}</div>
-          <Sparkline seed={`qd-${t}`} w={220} h={36} />
+          <div className="adm-card-label">In flight</div>
+          <div className="adm-card-val">{inFlight}</div>
+          <Sparkline seed={`if-${data?.completed_total || 0}`} w={220} h={36} />
         </div>
         <div className="adm-card">
-          <div className="adm-card-label">Active workers</div>
-          <div className="adm-card-val">{workers.filter((w) => w.state === 'busy').length}<small style={{ color: 'rgba(242,242,245,0.4)' }}> / {workers.length}</small></div>
-          <Sparkline seed={`aw-${t}`} w={220} h={36} />
+          <div className="adm-card-label">Completed (recent)</div>
+          <div className="adm-card-val">{recent.length}<small style={{ color: 'rgba(242,242,245,0.4)' }}> / 100</small></div>
+          <Sparkline seed={`rc-${recent.length}`} w={220} h={36} />
         </div>
         <div className="adm-card">
-          <div className="adm-card-label">Waiting · p95</div>
-          <div className="adm-card-val">142<span className="unit">ms</span></div>
-          <Sparkline seed={`wp-${t}`} w={220} h={36} />
+          <div className="adm-card-label">Latency · p95</div>
+          <div className="adm-card-val">{p95 ?? '—'}<span className="unit">{p95 != null ? 'ms' : ''}</span></div>
+          <Sparkline seed={`p95-${p95 || 0}`} w={220} h={36} />
         </div>
       </div>
       <div className="adm-panel" style={{ marginTop: 16 }}>
-        <div className="adm-panel-head"><h3>Workers</h3><span className="mono small">fleet</span></div>
+        <div className="adm-panel-head"><h3>Engine</h3><span className="mono small">single-node</span></div>
         <div className="ws-table no-border">
           <div className="ws-tr head adm-q-row">
             <span>Worker</span>
             <span>Model</span>
             <span>State</span>
             <span>In flight</span>
-            <span>Utilization</span>
+            <span>Recent p50</span>
           </div>
-          {workers.map((w) => (
-            <div className="ws-tr adm-q-row" key={w.id}>
-              <span className="mono">{w.id}</span>
-              <span className="mono">{w.model}</span>
-              <span>
-                <span className={`adm-state ${w.state}`}>
-                  <span className={`ws-dot ${w.state === 'busy' ? 'on' : w.state === 'idle' ? 'idle' : 'off'}`} />
-                  {w.state}
-                </span>
+          <div className="ws-tr adm-q-row">
+            <span className="mono">llama-cpp-01</span>
+            <span className="mono">mistral-7b</span>
+            <span>
+              <span className={`adm-state ${engineState}`}>
+                <span className={`ws-dot ${engineState === 'busy' ? 'on' : engineState === 'idle' ? 'idle' : 'off'}`} />
+                {engineState}
               </span>
-              <span className="mono">{w.reqs}</span>
-              <span>
-                <div className="adm-util">
-                  <div className="adm-util-fill" style={{ width: `${w.util * 100}%` }} />
-                </div>
-              </span>
-            </div>
-          ))}
+            </span>
+            <span className="mono">{inFlight}</span>
+            <span className="mono">{p50 != null ? `${p50}ms` : '—'}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -269,38 +342,72 @@ const QueueSection = () => {
 // --- Cache ---------------------------------------------------------
 
 const CacheSection = () => {
-  const t = useTicker(1500);
+  const [data, err] = useAdminPoll('/admin/cache/stats', 3000);
+  const [msg, setMsg] = React.useState(null);
+  const [busy, setBusy] = React.useState(false);
+
+  const flush = async () => {
+    if (busy) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const j = await adminFetch('/admin/cache/flush', { method: 'POST' });
+      setMsg(`Cleared ${j.cleared} entries.`);
+    } catch (e) {
+      setMsg(`Failed: ${e.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const fmtBytes = (b) => {
+    if (b == null) return '—';
+    if (b > 1e9) return `${(b / 1e9).toFixed(2)}<span class="unit">GB</span>`;
+    if (b > 1e6) return `${(b / 1e6).toFixed(1)}<span class="unit">MB</span>`;
+    if (b > 1e3) return `${(b / 1e3).toFixed(1)}<span class="unit">KB</span>`;
+    return `${b}<span class="unit">B</span>`;
+  };
+  const hitRatePct = data ? Math.round((data.hit_rate ?? 0) * 100) : '—';
+
   return (
     <div className="adm-section">
       <div className="ws-view-head">
         <h2>Cache</h2>
-        <p>Semantic + idempotency cache across the gateway.</p>
+        <p>
+          {err
+            ? <span style={{ color: 'oklch(0.78 0.16 25)' }}>Could not reach /admin/cache/stats: {err}</span>
+            : 'Semantic cache backed by Redis. Cosine-similarity threshold 0.95, TTL 1h per entry.'}
+        </p>
       </div>
       <div className="adm-overview-grid">
         <div className="adm-card">
           <div className="adm-card-label">Entries</div>
-          <div className="adm-card-val">28,402</div>
-          <Sparkline seed={`ce-${t}`} w={240} h={36} />
+          <div className="adm-card-val">{data?.entries ?? '—'}</div>
+          <Sparkline seed={`ce-${data?.entries || 0}`} w={240} h={36} />
         </div>
         <div className="adm-card">
           <div className="adm-card-label">Hit rate</div>
-          <div className="adm-card-val">{74 + Math.round(Math.sin(t * 0.4) * 3)}<span className="unit">%</span></div>
-          <Sparkline seed={`ch-${t}`} w={240} h={36} />
+          <div className="adm-card-val">{hitRatePct}{data ? <span className="unit">%</span> : null}</div>
+          <Sparkline seed={`ch-${data?.hits || 0}`} w={240} h={36} />
         </div>
         <div className="adm-card">
-          <div className="adm-card-label">TTL · avg</div>
-          <div className="adm-card-val">14<span className="unit">min</span></div>
-          <Sparkline seed={`ct-${t}`} w={240} h={36} />
+          <div className="adm-card-label">Hits / Misses</div>
+          <div className="adm-card-val" style={{ fontSize: 24 }}>
+            {data?.hits ?? '—'}<small style={{ color: 'rgba(242,242,245,0.4)' }}> / {data?.misses ?? '—'}</small>
+          </div>
+          <Sparkline seed={`hm-${data?.misses || 0}`} w={240} h={36} />
         </div>
         <div className="adm-card">
-          <div className="adm-card-label">Memory</div>
-          <div className="adm-card-val">3.84<span className="unit">GB</span></div>
-          <Sparkline seed={`cm-${t}`} w={240} h={36} />
+          <div className="adm-card-label">Redis memory</div>
+          <div className="adm-card-val" dangerouslySetInnerHTML={{ __html: fmtBytes(data?.memory_bytes) }} />
+          <Sparkline seed={`cm-${data?.memory_bytes || 0}`} w={240} h={36} />
         </div>
       </div>
       <div className="adm-cache-actions">
-        <button className="ws-set-btn">Flush expired</button>
-        <button className="ws-set-btn danger">Clear cache</button>
+        <button className="ws-set-btn danger" onClick={flush} disabled={busy}>
+          {busy ? 'Clearing…' : 'Clear cache'}
+        </button>
+        {msg && <span style={{ alignSelf: 'center', fontSize: 13, color: 'rgba(242,242,245,0.7)' }}>{msg}</span>}
       </div>
     </div>
   );
@@ -308,35 +415,31 @@ const CacheSection = () => {
 
 // --- Logs ----------------------------------------------------------
 
-const LOG_LINES = [
-  { ts: '14:22:01.412', latency: 218, model: 'llama-3.1-70b', trace: '7a4f3d12c08b', status: 200, msg: 'chat.completions · stream' },
-  { ts: '14:22:00.984', latency: 142, model: 'mistral-7b',    trace: 'b8e2cc1849aa', status: 200, msg: 'chat.completions · stream' },
-  { ts: '14:21:59.221', latency: 312, model: 'llama-3.1-70b', trace: '90c3a721d7e0', status: 200, msg: 'embeddings' },
-  { ts: '14:21:58.802', latency: 196, model: 'phi-3.5-mini',  trace: '11ddee4f0c1a', status: 200, msg: 'chat.completions' },
-  { ts: '14:21:58.116', latency: 1240, model: 'llama-3.1-70b', trace: '2afe5b39a012', status: 408, msg: 'timeout · client cancelled' },
-  { ts: '14:21:57.660', latency: 78, model: 'mistral-7b',    trace: 'cc7a921b15dd', status: 200, msg: 'chat.completions · cache hit' },
-  { ts: '14:21:57.013', latency: 174, model: 'llama-3.1-70b', trace: '4b1ccaf09810', status: 200, msg: 'chat.completions · stream' },
-  { ts: '14:21:56.488', latency: 0,   model: '—',             trace: '—',           status: 401, msg: 'auth · invalid bearer' },
-  { ts: '14:21:55.901', latency: 207, model: 'llama-3.1-70b', trace: 'a1fe3c8855bb', status: 200, msg: 'chat.completions · stream' },
-  { ts: '14:21:55.220', latency: 161, model: 'phi-3.5-mini',  trace: '6e10d9a72c44', status: 200, msg: 'chat.completions' },
-  { ts: '14:21:54.770', latency: 184, model: 'mistral-7b',    trace: 'fa39db8011c3', status: 200, msg: 'embeddings · batch=8' },
-  { ts: '14:21:54.211', latency: 246, model: 'llama-3.1-70b', trace: '38aacc12bb19', status: 200, msg: 'chat.completions · stream' },
-];
-
 const LogsSection = () => {
   const [filter, setFilter] = React.useState('all');
-  const filtered = LOG_LINES.filter((l) => {
-    if (filter === 'all') return true;
-    if (filter === 'errors') return l.status >= 400;
-    if (filter === '200') return l.status === 200;
-    return true;
-  });
+  const [data, err] = useAdminPoll(`/admin/logs?filter=${filter}&limit=200`, 2000);
+  const logs = data?.logs || [];
+
+  const fmtTs = (epoch) => {
+    if (!epoch) return '—';
+    const d = new Date(epoch * 1000);
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    const ms = String(d.getMilliseconds()).padStart(3, '0');
+    return `${hh}:${mm}:${ss}.${ms}`;
+  };
+
   return (
     <div className="adm-section">
       <div className="adm-logs-head">
         <div>
           <h2>Logs</h2>
-          <p>Live tail · stream paused</p>
+          <p>
+            {err
+              ? <span style={{ color: 'oklch(0.78 0.16 25)' }}>Could not reach /admin/logs: {err}</span>
+              : `Most recent ${logs.length} of ${data?.total ?? 0} captured requests · refreshes every 2s`}
+          </p>
         </div>
         <div className="ws-segment">
           {['all', '200', 'errors'].map((v) => (
@@ -353,18 +456,23 @@ const LogsSection = () => {
           <span>Trace</span>
           <span>Event</span>
         </div>
-        {filtered.map((l, i) => (
-          <div className="adm-log-row" key={i}>
-            <span className="mono small">{l.ts}</span>
+        {logs.length === 0 && !err && (
+          <div style={{ padding: '32px 18px', color: 'rgba(242,242,245,0.45)', fontSize: 13, textAlign: 'center' }}>
+            No requests captured yet — send a chat from the workspace.
+          </div>
+        )}
+        {logs.map((l, i) => (
+          <div className="adm-log-row" key={`${l.trace_id}-${i}`}>
+            <span className="mono small">{fmtTs(l.ts)}</span>
             <span>
-              <span className={`adm-status-pill s${Math.floor(l.status / 100)}xx`}>
+              <span className={`adm-status-pill s${Math.floor((l.status || 200) / 100)}xx`}>
                 {l.status}
               </span>
             </span>
-            <span className="mono">{l.latency ? `${l.latency}ms` : '—'}</span>
-            <span className="mono">{l.model}</span>
-            <span className="mono small" style={{ color: 'rgba(242,242,245,0.45)' }}>{l.trace}</span>
-            <span style={{ color: 'rgba(242,242,245,0.65)' }}>{l.msg}</span>
+            <span className="mono">{l.latency_ms != null ? `${l.latency_ms}ms` : '—'}</span>
+            <span className="mono">{l.model || '—'}</span>
+            <span className="mono small" style={{ color: 'rgba(242,242,245,0.45)' }}>{l.trace_id ? l.trace_id.slice(-12) : '—'}</span>
+            <span style={{ color: 'rgba(242,242,245,0.65)' }}>{l.message}</span>
           </div>
         ))}
       </div>
@@ -375,21 +483,57 @@ const LogsSection = () => {
 // --- Metrics (admin) -----------------------------------------------
 
 const AdminMetricsSection = () => {
-  const t = useTicker(1500);
+  const [s, err] = useAdminPoll('/admin/metrics/summary', 2000);
   return (
     <div className="adm-section">
       <div className="ws-view-head">
         <h2>Metrics</h2>
-        <p>Engine telemetry · last hour.</p>
+        <p>
+          {err
+            ? <span style={{ color: 'oklch(0.78 0.16 25)' }}>Could not reach /admin/metrics/summary: {err}</span>
+            : 'Engine telemetry rolled up from Prometheus counters · refreshes every 2 seconds.'}
+        </p>
       </div>
-      <div className="adm-overview-row">
+      <div className="adm-overview-grid three">
+        <div className="adm-card">
+          <div className="adm-card-label">TTFT (mean)</div>
+          <div className="adm-card-val">{s?.ttft_mean_ms ?? '—'}<span className="unit">ms</span></div>
+          <Sparkline seed={`ttft-${s?.uptime_sec || 0}`} w={240} h={36} />
+        </div>
+        <div className="adm-card">
+          <div className="adm-card-label">Tokens / second</div>
+          <div className="adm-card-val">{s?.tokens_per_sec ?? '—'}</div>
+          <Sparkline seed={`tps-${s?.tokens_total || 0}`} w={240} h={36} />
+        </div>
+        <div className="adm-card">
+          <div className="adm-card-label">Total tokens</div>
+          <div className="adm-card-val">{s?.tokens_total ?? '—'}</div>
+          <Sparkline seed={`tok-${s?.tokens_total || 0}`} w={240} h={36} />
+        </div>
+        <div className="adm-card">
+          <div className="adm-card-label">Cache hit rate</div>
+          <div className="adm-card-val">{s ? Math.round((s.cache_hit_rate ?? 0) * 100) : '—'}<span className="unit">%</span></div>
+          <Sparkline seed={`ch-${s?.cache_hits || 0}`} w={240} h={36} />
+        </div>
+        <div className="adm-card">
+          <div className="adm-card-label">Error rate</div>
+          <div className="adm-card-val">{s ? (s.error_rate * 100).toFixed(2) : '—'}<span className="unit">%</span></div>
+          <Sparkline seed={`er-${s?.errors || 0}`} w={240} h={36} />
+        </div>
+        <div className="adm-card">
+          <div className="adm-card-label">Process memory</div>
+          <div className="adm-card-val">{s?.memory_mb ?? '—'}<span className="unit">MB</span></div>
+          <Sparkline seed={`mem-${s?.memory_mb || 0}`} w={240} h={36} />
+        </div>
+      </div>
+      <div className="adm-overview-row" style={{ marginTop: 16 }}>
         <div className="adm-panel">
-          <div className="adm-panel-head"><h3>Latency · p50 / p95 / p99</h3><span className="mono small">ms</span></div>
-          <div className="adm-bigchart"><BigSparkline seed={`lat-${t}`} stroke="rgba(242,242,245,0.85)" /></div>
+          <div className="adm-panel-head"><h3>Latency trend</h3><span className="mono small">{s?.ttft_mean_ms ?? '—'}ms mean</span></div>
+          <div className="adm-bigchart"><BigSparkline seed={`lat-${s?.uptime_sec || 0}`} stroke="rgba(242,242,245,0.85)" /></div>
         </div>
         <div className="adm-panel">
-          <div className="adm-panel-head"><h3>GPU utilization</h3><span className="mono small">67%</span></div>
-          <div className="adm-bigchart"><BigSparkline seed={`gpu-${t}`} stroke="oklch(0.72 0.16 248)" /></div>
+          <div className="adm-panel-head"><h3>Throughput trend</h3><span className="mono small">{s?.tokens_per_sec ?? '—'} tps</span></div>
+          <div className="adm-bigchart"><BigSparkline seed={`tps-${s?.tokens_total || 0}`} stroke="oklch(0.72 0.16 248)" /></div>
         </div>
       </div>
     </div>
