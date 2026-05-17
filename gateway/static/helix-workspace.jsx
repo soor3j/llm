@@ -277,15 +277,127 @@ const MetricsRail = ({ collapsed, onToggle }) => {
 
 // --- Chat view -----------------------------------------------------
 
-const ChatView = ({ model }) => {
-  const [messages, setMessages] = React.useState([
-    { role: 'assistant', content: 'Hi — the engine is online and the model is loaded. What would you like to ask?' },
-  ]);
+// Friendly opening — never persisted to the backend.
+const INITIAL_GREETING = {
+  role: 'assistant',
+  content: 'Hi — the engine is online and the model is loaded. What would you like to ask?',
+};
+
+const ChatView = ({ model, chatId, setChatId, onNewChat }) => {
+  const [messages, setMessages] = React.useState([INITIAL_GREETING]);
+  const [title, setTitle] = React.useState('New chat');
   const [prompt, setPrompt] = React.useState('');
   const [streaming, setStreaming] = React.useState(false);
+  const [loadingChat, setLoadingChat] = React.useState(false);
   const [params, setParams] = React.useState({ temperature: 0.7, maxTokens: 512, streaming: true });
   const messagesRef = React.useRef(null);
   const abortRef = React.useRef(null);
+
+  // Load a chat from the backend when chatId changes, or pick the most-recent
+  // when chatId is null on first mount.
+  React.useEffect(() => {
+    let cancelled = false;
+    const apiKey = getApiKey();
+    if (!apiKey) return;
+    (async () => {
+      if (chatId == null) {
+        // No specific chat selected — try to pick the most recent.
+        try {
+          const r = await fetch(`${apiBase()}/chats`, {
+            headers: { Authorization: `Bearer ${apiKey}` },
+          });
+          if (!r.ok) return;
+          const j = await r.json();
+          const first = j?.data?.[0];
+          if (!cancelled && first) setChatId(first.id);
+        } catch {}
+        return;
+      }
+      setLoadingChat(true);
+      try {
+        const r = await fetch(`${apiBase()}/chats/${chatId}`, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        if (!r.ok) {
+          // Stale id — drop it.
+          if (!cancelled) {
+            setChatId(null);
+            setMessages([INITIAL_GREETING]);
+            setTitle('New chat');
+          }
+          return;
+        }
+        const j = await r.json();
+        if (!cancelled) {
+          setTitle(j.title || 'New chat');
+          setMessages(
+            j.messages && j.messages.length > 0
+              ? j.messages.map((m) => ({ role: m.role, content: m.content }))
+              : [INITIAL_GREETING]
+          );
+        }
+      } finally {
+        if (!cancelled) setLoadingChat(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId]);
+
+  // Persist the full message list — creates the chat the first time, updates it after.
+  const persist = async (finalMessages) => {
+    const apiKey = getApiKey();
+    if (!apiKey) return;
+    const persistable = finalMessages.filter((m) => m.content && m !== INITIAL_GREETING);
+    if (persistable.length === 0) return;
+    try {
+      if (chatId == null) {
+        const r = await fetch(`${apiBase()}/chats`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({ messages: persistable }),
+        });
+        if (r.ok) {
+          const j = await r.json();
+          setChatId(j.id);
+          setTitle(j.title || 'New chat');
+        }
+      } else {
+        const r = await fetch(`${apiBase()}/chats/${chatId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({ messages: persistable }),
+        });
+        if (r.ok) {
+          const j = await r.json();
+          if (j.title) setTitle(j.title);
+        }
+      }
+    } catch {}
+  };
+
+  // Start a fresh conversation: abort in-flight stream, clear state, drop the chatId.
+  const handleNewChat = () => {
+    abortRef.current?.abort?.();
+    setMessages([INITIAL_GREETING]);
+    setTitle('New chat');
+    setPrompt('');
+    setStreaming(false);
+    onNewChat?.();
+  };
+
+  const handleDelete = async () => {
+    if (chatId == null) { handleNewChat(); return; }
+    if (!confirm('Delete this conversation?')) return;
+    const apiKey = getApiKey();
+    try {
+      await fetch(`${apiBase()}/chats/${chatId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+    } catch {}
+    handleNewChat();
+  };
 
   React.useEffect(() => {
     if (messagesRef.current) {
@@ -392,6 +504,8 @@ const ChatView = ({ model }) => {
     } finally {
       setStreaming(false);
       abortRef.current = null;
+      // Snapshot the latest messages and save to backend.
+      setMessages((m) => { persist(m); return m; });
     }
   };
 
@@ -399,14 +513,19 @@ const ChatView = ({ model }) => {
     <section className="ws-chat">
       <div className="ws-chat-head">
         <div>
-          <div className="ws-chat-title">Streaming tokens &amp; SSE</div>
+          <div className="ws-chat-title">{title}</div>
           <div className="ws-chat-sub mono small">
-            session · 7a4f…b2c1 · {model.name}
+            {chatId ? `chat · ${chatId.slice(-8)}` : 'new chat'} · {model.name}
+            {loadingChat && ' · loading…'}
           </div>
         </div>
         <div className="ws-chat-head-actions">
-          <button className="ws-icon-btn" title="Share"><Icon.Network size={14} /></button>
-          <button className="ws-icon-btn" title="Settings"><Icon.Lock size={14} /></button>
+          <button className="ws-icon-btn" title="New chat" onClick={handleNewChat}>
+            + New
+          </button>
+          <button className="ws-icon-btn" title="Delete chat" onClick={handleDelete}>
+            <Icon.Close size={12} />
+          </button>
         </div>
       </div>
 
@@ -622,25 +741,103 @@ const ApiView = () => {
 
 // --- History / Metrics / Settings (minimal) ------------------------
 
-const HistoryView = () => (
-  <section className="ws-view">
-    <div className="ws-view-head">
-      <h2>History</h2>
-      <p>Recent conversations across this environment.</p>
-    </div>
-    <div className="ws-history">
-      {SAMPLE_CHATS.map((c) => (
-        <div className="ws-history-row" key={c.id}>
-          <div className="ws-history-meta">
-            <div className="ws-history-title">{c.title}</div>
-            <div className="ws-history-preview">{c.preview}</div>
+// Format a unix timestamp as a relative "5m ago" / "2h ago" string.
+const relTime = (ts) => {
+  if (!ts) return '—';
+  const diff = Math.max(0, Date.now() / 1000 - ts);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+};
+
+const HistoryView = ({ openChat }) => {
+  const [chats, setChats] = React.useState(null);
+  const [err, setErr] = React.useState(null);
+  const [reloadKey, setReloadKey] = React.useState(0);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const apiKey = getApiKey();
+        if (!apiKey) { setErr('not signed in'); return; }
+        const r = await fetch(`${apiBase()}/chats?limit=100`, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const j = await r.json();
+        if (!cancelled) { setChats(j.data || []); setErr(null); }
+      } catch (e) {
+        if (!cancelled) setErr(e.message);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [reloadKey]);
+
+  const onDelete = async (id, e) => {
+    e?.stopPropagation?.();
+    if (!confirm('Delete this conversation?')) return;
+    try {
+      const apiKey = getApiKey();
+      await fetch(`${apiBase()}/chats/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      setReloadKey((k) => k + 1);
+    } catch {}
+  };
+
+  return (
+    <section className="ws-view">
+      <div className="ws-view-head">
+        <h2>History</h2>
+        <p>
+          {err
+            ? <span style={{ color: 'oklch(0.78 0.16 25)' }}>Could not reach /v1/chats: {err}</span>
+            : `Your conversations · saved in Redis · ${chats?.length ?? 0} total.`}
+        </p>
+      </div>
+      <div className="ws-history">
+        {chats === null && !err && (
+          <div className="ws-history-row" style={{ color: 'rgba(242,242,245,0.4)' }}>Loading…</div>
+        )}
+        {chats && chats.length === 0 && (
+          <div className="ws-history-row" style={{ color: 'rgba(242,242,245,0.45)' }}>
+            No conversations yet. Send a message in the Chats tab and it'll appear here.
           </div>
-          <div className="mono small" style={{ color: 'rgba(242,242,245,0.4)' }}>{c.when}</div>
-        </div>
-      ))}
-    </div>
-  </section>
-);
+        )}
+        {(chats || []).map((c) => (
+          <div
+            className="ws-history-row"
+            key={c.id}
+            onClick={() => openChat?.(c.id)}
+            style={{ cursor: 'pointer' }}
+          >
+            <div className="ws-history-meta">
+              <div className="ws-history-title">{c.title}</div>
+              <div className="ws-history-preview mono small">
+                {c.message_count} messages · id {c.id.slice(-8)}
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div className="mono small" style={{ color: 'rgba(242,242,245,0.4)' }}>
+                {relTime(c.updated_at)}
+              </div>
+              <button
+                className="ws-icon-btn"
+                title="Delete"
+                onClick={(e) => onDelete(c.id, e)}
+              >
+                <Icon.Close size={11} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
 
 const MetricsView = () => {
   const [summary, err] = useMetricsSummary(2000);
@@ -744,6 +941,11 @@ const UserWorkspace = ({ onSignOut, leaving }) => {
   const [model, setModel] = React.useState(MODELS[1]);
   const [active, setActive] = React.useState('chat');
   const [railCollapsed, setRailCollapsed] = React.useState(false);
+  // Lifted: the currently-open conversation. ChatView reads/writes it; the
+  // History tab can switch tabs and open a different chat.
+  const [chatId, setChatId] = React.useState(null);
+  const openChat = (id) => { setChatId(id); setActive('chat'); };
+  const newChat = () => { setChatId(null); setActive('chat'); };
 
   return (
     <div className={`workspace user ${leaving ? 'leaving' : ''}`}>
@@ -751,11 +953,13 @@ const UserWorkspace = ({ onSignOut, leaving }) => {
       <div className="ws-body">
         <WsSidebar active={active} setActive={setActive} />
         <main className="ws-main">
-          {active === 'chat' && <ChatView model={model} />}
+          {active === 'chat' && (
+            <ChatView model={model} chatId={chatId} setChatId={setChatId} onNewChat={newChat} />
+          )}
           {active === 'models' && <ModelsView />}
           {active === 'metrics' && <MetricsView />}
           {active === 'api' && <ApiView />}
-          {active === 'history' && <HistoryView />}
+          {active === 'history' && <HistoryView openChat={openChat} />}
           {active === 'settings' && <SettingsView />}
         </main>
         {active === 'chat' && (

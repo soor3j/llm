@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from gateway.config import get_settings
 from gateway.metrics import get_metrics_app
-from gateway.routers import admin, auth, chat, health, metrics_summary, models
+from gateway.routers import admin, auth, chat, chats, health, metrics_summary, models
 from gateway.services.engine import LlamaCppClient
 from gateway.services.queue_tracker import QueueTracker
 
@@ -57,9 +57,11 @@ async def lifespan(app: FastAPI):
     app.state.cache = None
     app.state.users = None
     app.state.request_log = None
+    app.state.chat_history = None
     try:
         import redis.asyncio as aioredis
         from gateway.services.cache import SemanticCache
+        from gateway.services.chat_history import ChatHistory
         from gateway.services.request_log import RequestLog
         from gateway.services.users import UserRegistry
 
@@ -73,9 +75,10 @@ async def lifespan(app: FastAPI):
         app.state.cache = await SemanticCache.create(r, settings)
         app.state.users = UserRegistry(r)
         app.state.request_log = RequestLog(r)
+        app.state.chat_history = ChatHistory(r)
         log.info("redis_connected", host=settings.redis_host, port=settings.redis_port)
     except Exception as exc:
-        log.warning("redis_unavailable", error=str(exc), detail="Running without cache, users, log capture")
+        log.warning("redis_unavailable", error=str(exc), detail="Running without cache, users, log capture, chat history")
 
     log.info("server_ready", port=8000)
     yield
@@ -100,6 +103,7 @@ app.include_router(health.router)
 app.include_router(chat.router, prefix="/v1")
 app.include_router(models.router, prefix="/v1")
 app.include_router(auth.router, prefix="/v1")
+app.include_router(chats.router, prefix="/v1")
 app.include_router(metrics_summary.router, prefix="/v1")
 app.include_router(admin.router, prefix="/admin")
 
