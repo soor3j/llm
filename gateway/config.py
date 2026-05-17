@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     max_tokens_default: int = 512
     n_gpu_layers: int = 0
 
+    # Chat template selector. "auto" detects from MODEL_NAME / MODEL_FILE; otherwise one of:
+    # mistral, llama3, qwen2, chatml, phi3, gemma. Tells the engine which special tokens
+    # and stop sequences to wrap the conversation in.
+    chat_template: str = "auto"
+
     log_level: str = "INFO"
     workers: int = 4
 

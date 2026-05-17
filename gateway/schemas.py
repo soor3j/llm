@@ -79,6 +79,8 @@ class ModelInfo(BaseModel):
     owned_by: str = "local"
     context_length: int | None = None
     quantization: str | None = None
+    chat_template: str | None = None
+    model_file: str | None = None
 
 
 class ModelList(BaseModel):

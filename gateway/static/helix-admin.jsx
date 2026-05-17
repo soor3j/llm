@@ -122,7 +122,7 @@ const OverviewSection = () => {
               <div className="adm-card-val">{c.value}</div>
               <div className="adm-card-trend">{c.trend}</div>
             </div>
-            <Sparkline seed={c.spark + t} w={240} h={42} stroke="rgba(242,242,245,0.5)" />
+            <Sparkline seed={c.spark + (s?.uptime_sec || 0)} w={240} h={42} stroke="rgba(242,242,245,0.5)" />
           </div>
         ))}
       </div>

@@ -43,6 +43,9 @@ async def lifespan(app: FastAPI):
     app.state.engine_client = LlamaCppClient(
         host=settings.engine_host,
         port=settings.engine_port,
+        chat_template=settings.chat_template,
+        model_name=settings.model_name,
+        model_path=settings.model_path,
     )
     app.state.inference_backend = settings.inference_backend
 
