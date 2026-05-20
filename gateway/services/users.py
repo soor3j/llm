@@ -117,6 +117,54 @@ class UserRegistry:
             str(int(time.time())),
         )
 
+    async def rotate_key(self, email: str) -> Optional[dict]:
+        """Generate a fresh api_key for ``email`` and invalidate the old one.
+
+        Returns the new user dict on success, None if the user doesn't exist.
+        After this returns the OLD api_key will no longer authenticate.
+        """
+        email = (email or "").strip().lower()
+        if not email:
+            return None
+        user_key = f"{_USER_HASH_PREFIX}{email}"
+        data = await self._redis.hgetall(user_key)
+        if not data:
+            return None
+        old_key = data.get("api_key")
+        new_key = _generate_api_key()
+        now = str(int(time.time()))
+        pipe = self._redis.pipeline()
+        if old_key:
+            pipe.delete(f"{_KEY_INDEX_PREFIX}{old_key}")
+        pipe.set(f"{_KEY_INDEX_PREFIX}{new_key}", email)
+        pipe.hset(
+            user_key,
+            mapping={"api_key": new_key, "last_active": now},
+        )
+        await pipe.execute()
+        log.info("user_key_rotated", email=email)
+        return {
+            "email": email,
+            "api_key": new_key,
+            "role": data.get("role", "user"),
+        }
+
+    async def get(self, email: str) -> Optional[dict]:
+        """Fetch a user (for /v1/auth/me). api_key returned unmasked."""
+        email = (email or "").strip().lower()
+        if not email:
+            return None
+        data = await self._redis.hgetall(f"{_USER_HASH_PREFIX}{email}")
+        if not data:
+            return None
+        return {
+            "email": data.get("email", email),
+            "api_key": data.get("api_key", ""),
+            "role": data.get("role", "user"),
+            "created_at": int(data.get("created_at", 0)),
+            "last_active": int(data.get("last_active", 0)),
+        }
+
     async def list_all(self) -> list[dict]:
         """Return all users with public fields (api_key masked)."""
         emails = await self._redis.smembers(_USERS_SET)

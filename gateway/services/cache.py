@@ -21,13 +21,20 @@ class SemanticCache:
         self._model = model  # sentence-transformers model
 
     @classmethod
-    async def create(cls, redis_client, settings) -> "SemanticCache":
-        from sentence_transformers import SentenceTransformer
+    async def create(cls, redis_client, settings, model=None) -> "SemanticCache":
+        # The model can be injected (shared with the RAG store) — fall back to
+        # loading our own copy if the caller doesn't provide one.
+        if model is None:
+            from sentence_transformers import SentenceTransformer
 
-        log.info("loading_embedding_model", model="all-MiniLM-L6-v2")
-        model = SentenceTransformer("all-MiniLM-L6-v2")
-        log.info("embedding_model_loaded")
+            log.info("loading_embedding_model", model="all-MiniLM-L6-v2")
+            model = SentenceTransformer("all-MiniLM-L6-v2")
+            log.info("embedding_model_loaded")
         return cls(redis_client, settings, model)
+
+    @property
+    def model(self):
+        return self._model
 
     def _messages_to_text(self, messages: list[ChatMessage]) -> str:
         return " ".join(f"{m.role}: {m.content}" for m in messages)

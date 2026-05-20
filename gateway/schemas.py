@@ -22,6 +22,13 @@ class ChatCompletionRequest(BaseModel):
     frequency_penalty: float = 0.0
     user: str | None = None
 
+    # --- RAG extension (non-standard, ignored by stock OpenAI SDKs) ---
+    # When True, the gateway queries the caller's document store for the
+    # top-k chunks most similar to the latest user message and prepends them
+    # to the conversation as a system message before sending to the engine.
+    use_rag: bool = False
+    rag_top_k: int = 4
+
 
 class Usage(BaseModel):
     prompt_tokens: int

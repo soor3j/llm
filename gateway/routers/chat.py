@@ -91,6 +91,43 @@ async def chat_completions(
     start_time = time.perf_counter()
     request_id = f"chatcmpl-{uuid.uuid4().hex[:8]}"
 
+    # --- RAG context injection ---------------------------------------
+    # If the caller asked us to use their documents, retrieve the most
+    # similar chunks for their latest user turn and prepend them as a
+    # system message. We mutate request_body.messages in place so both the
+    # streaming and non-streaming paths see the augmented conversation.
+    if request_body.use_rag:
+        rag = getattr(request.app.state, "rag", None)
+        users = getattr(request.app.state, "users", None)
+        last_user_msg = next(
+            (m.content for m in reversed(request_body.messages) if m.role == "user"),
+            None,
+        )
+        if rag is not None and last_user_msg:
+            email = "__master__"
+            if users is not None:
+                try:
+                    email = (await users.email_for_key(api_key)) or "__master__"
+                except Exception:
+                    pass
+            try:
+                hits = await rag.query(
+                    email=email,
+                    query_text=last_user_msg,
+                    top_k=max(1, min(request_body.rag_top_k or 4, 8)),
+                )
+            except Exception as exc:
+                log.warning("rag_query_failed", error=str(exc))
+                hits = []
+            if hits:
+                from gateway.schemas import ChatMessage as _CM
+
+                context_prompt = rag.build_context_prompt(hits)
+                request_body.messages = [
+                    _CM(role="system", content=context_prompt)
+                ] + list(request_body.messages)
+                log.info("rag_context_injected", model=model, hits=len(hits))
+
     # Mark this request as in-flight in the queue tracker.
     if tracker is not None:
         try:

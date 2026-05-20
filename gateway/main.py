@@ -8,7 +8,16 @@ from fastapi.staticfiles import StaticFiles
 
 from gateway.config import get_settings
 from gateway.metrics import get_metrics_app
-from gateway.routers import admin, auth, chat, chats, health, metrics_summary, models
+from gateway.routers import (
+    admin,
+    auth,
+    chat,
+    chats,
+    documents,
+    health,
+    metrics_summary,
+    models,
+)
 from gateway.services.engine import LlamaCppClient
 from gateway.services.queue_tracker import QueueTracker
 
@@ -58,10 +67,12 @@ async def lifespan(app: FastAPI):
     app.state.users = None
     app.state.request_log = None
     app.state.chat_history = None
+    app.state.rag = None
     try:
         import redis.asyncio as aioredis
         from gateway.services.cache import SemanticCache
         from gateway.services.chat_history import ChatHistory
+        from gateway.services.rag import RAGStore
         from gateway.services.request_log import RequestLog
         from gateway.services.users import UserRegistry
 
@@ -72,13 +83,16 @@ async def lifespan(app: FastAPI):
         )
         await r.ping()
         app.state.redis_client = r
+        # Cache loads the embedding model; RAG borrows the same instance so
+        # we don't keep two copies in memory.
         app.state.cache = await SemanticCache.create(r, settings)
         app.state.users = UserRegistry(r)
         app.state.request_log = RequestLog(r)
         app.state.chat_history = ChatHistory(r)
+        app.state.rag = RAGStore(r, app.state.cache.model)
         log.info("redis_connected", host=settings.redis_host, port=settings.redis_port)
     except Exception as exc:
-        log.warning("redis_unavailable", error=str(exc), detail="Running without cache, users, log capture, chat history")
+        log.warning("redis_unavailable", error=str(exc), detail="Running without cache, users, log capture, chat history, RAG")
 
     log.info("server_ready", port=8000)
     yield
@@ -104,6 +118,7 @@ app.include_router(chat.router, prefix="/v1")
 app.include_router(models.router, prefix="/v1")
 app.include_router(auth.router, prefix="/v1")
 app.include_router(chats.router, prefix="/v1")
+app.include_router(documents.router, prefix="/v1")
 app.include_router(metrics_summary.router, prefix="/v1")
 app.include_router(admin.router, prefix="/admin")
 
