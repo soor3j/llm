@@ -1,33 +1,24 @@
 <div align="center">
 
-# 🧠 LLM Inference Server
+# LLM Inference Server
 
 ### A production-grade, self-hosted Large Language Model inference server  
 ### with an OpenAI-compatible REST API
-
-[![CI](https://github.com/soor3j/LLM/actions/workflows/ci.yml/badge.svg)](https://github.com/soor3j/LLM/actions)
-![Python](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi&logoColor=white)
-![Docker](https://img.shields.io/badge/docker-compose-2496ED?logo=docker&logoColor=white)
-![Redis](https://img.shields.io/badge/redis-7-DC382D?logo=redis&logoColor=white)
-![Prometheus](https://img.shields.io/badge/prometheus-monitoring-E6522C?logo=prometheus&logoColor=white)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Tests](https://img.shields.io/badge/tests-13%20passing-brightgreen)
 
 ---
 
 **Run your own AI — privately, securely, for free.**  
 No cloud API costs. No data leaving your machine. Full observability included.
 
-[What Is This?](#-what-is-this-non-technical-explanation) • [Architecture](#-architecture) • [Quickstart](#-quickstart-5-minutes) • [API Reference](#-api-reference) • [How It Works](#-how-every-component-works) • [Configuration](#%EF%B8%8F-configuration) • [Testing](#-testing) • [Observability](#-observability) • [Design Decisions](#-architecture-decision-records) • [Roadmap](#-roadmap) • [FAQ](#-faq) • [Glossary](#-glossary)
+[What Is This?](#what-is-this-non-technical-explanation) • [Architecture](#architecture) • [Quickstart](#quickstart-5-minutes) • [API Reference](#api-reference) • [How It Works](#how-every-component-works) • [Configuration](#configuration) • [Testing](#testing) • [Observability](#observability) • [Design Decisions](#architecture-decision-records) • [Roadmap](#roadmap) • [FAQ](#faq) • [Glossary](#glossary)
 
 </div>
 
 ---
 
-## 📖 What Is This? (Non-Technical Explanation)
+## What Is This? (Non-Technical Explanation)
 
-> **Skip to [Quickstart](#-quickstart-5-minutes) if you already know what LLMs are.**
+> **Skip to [Quickstart](#quickstart-5-minutes) if you already know what LLMs are.**
 
 ### The Problem This Solves
 
@@ -73,7 +64,7 @@ By default it runs **Mistral 7B Instruct** — a 7-billion-parameter open-source
 
 ---
 
-## 🏗 Architecture
+## Architecture
 
 ### High-Level Diagram
 
@@ -198,7 +189,7 @@ grafana
 
 ---
 
-## ⚡ Quickstart (5 Minutes)
+## Quickstart (5 Minutes)
 
 ### Prerequisites
 
@@ -378,7 +369,7 @@ console.log(response.choices[0].message.content);
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 llm-inference-server/
@@ -444,7 +435,7 @@ llm-inference-server/
 
 ---
 
-## 🔬 How Every Component Works
+## How Every Component Works
 
 ### 1. The Gateway (`gateway/`)
 
@@ -748,7 +739,7 @@ Health checks:
 
 ---
 
-## 📡 API Reference
+## API Reference
 
 ### Authentication
 
@@ -950,7 +941,7 @@ All errors follow the OpenAI error schema for drop-in compatibility:
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 All configuration is via environment variables. Copy `.env.example` to `.env` and edit:
 
@@ -991,7 +982,7 @@ All configuration is via environment variables. Copy `.env.example` to `.env` an
 
 ---
 
-## 🧪 Testing
+## Testing
 
 ### Running the Test Suite
 
@@ -1080,7 +1071,7 @@ async def test_chat_completion_returns_200_with_valid_key(client):
 
 ---
 
-## 📊 Observability
+## Observability
 
 ### Grafana Dashboard
 
@@ -1117,7 +1108,7 @@ rate(llm_errors_total[5m])
 
 ---
 
-## 🏃 Benchmarking
+## Benchmarking
 
 Run the built-in benchmark suite against a live stack:
 
@@ -1151,7 +1142,7 @@ Results are written to `benchmarks/results.md`.
 
 ---
 
-## 🔧 Development Setup
+## Development Setup
 
 ### Local Development (without Docker)
 
@@ -1220,7 +1211,7 @@ To use a different GGUF model:
 
 ---
 
-## 📐 Architecture Decision Records
+## Architecture Decision Records
 
 All significant design choices are documented in `docs/adr/`. Here is a summary:
 
@@ -1298,7 +1289,7 @@ Exact string matching treats all of these as different. Semantic caching recogni
 
 ---
 
-## 🔭 Roadmap
+## Roadmap
 
 ### Phase 2 (GPU Support + Scalability)
 
@@ -1319,7 +1310,7 @@ Exact string matching treats all of these as different. Semantic caching recogni
 
 ---
 
-## ❓ FAQ
+## FAQ
 
 <details>
 <summary><b>Can I use models other than Mistral 7B?</b></summary>
@@ -1421,7 +1412,7 @@ Ollama and LM Studio are excellent for personal local use. This project is desig
 
 ---
 
-## 📚 Glossary
+## Glossary
 
 **ASGI (Asynchronous Server Gateway Interface)** — The Python web server standard that allows truly async request handling. FastAPI and uvicorn use ASGI. The older standard (WSGI) was synchronous — one request blocked until it completed.
 
@@ -1475,7 +1466,7 @@ Ollama and LM Studio are excellent for personal local use. This project is desig
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feat/your-feature`
@@ -1493,7 +1484,7 @@ Ollama and LM Studio are excellent for personal local use. This project is desig
 
 ---
 
-## 📜 License
+## License
 
 MIT License — see [LICENSE](LICENSE) file for full text.
 
