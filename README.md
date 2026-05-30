@@ -384,8 +384,13 @@ llm-inference-server/
 │   │
 │   ├── routers/                      # HTTP endpoint handlers
 │   │   ├── chat.py                   # POST /v1/chat/completions (main inference)
+│   │   ├── chats.py                  # GET/DELETE /v1/chats (conversation history)
+│   │   ├── auth.py                   # POST /v1/auth/register, /login, /me
+│   │   ├── documents.py              # POST/GET/DELETE /v1/documents (RAG uploads)
 │   │   ├── health.py                 # GET /health (liveness check)
-│   │   └── models.py                 # GET /v1/models (list available models)
+│   │   ├── models.py                 # GET /v1/models (list available models)
+│   │   ├── admin.py                  # GET /admin/* (users, queue, logs, cache)
+│   │   └── metrics_summary.py        # GET /v1/metrics/summary
 │   │
 │   ├── middleware/                   # Request processing pipeline
 │   │   ├── auth.py                   # Bearer token validation (timing-safe)
@@ -393,7 +398,13 @@ llm-inference-server/
 │   │
 │   └── services/                     # External service integrations
 │       ├── engine.py                 # HTTP client for llama.cpp
+│       ├── chat_templates.py         # Prompt formatters: mistral/llama3/qwen2/phi3/gemma/chatml
 │       ├── cache.py                  # Semantic cache (embeddings + Redis)
+│       ├── rag.py                    # Per-user document store (chunk + embed + query)
+│       ├── users.py                  # User registry (bcrypt passwords, sk-* API keys)
+│       ├── chat_history.py           # Per-user conversation history (Redis)
+│       ├── request_log.py            # Append-only request log (Redis)
+│       ├── queue_tracker.py          # In-memory in-flight request tracker
 │       └── streaming.py              # SSE (Server-Sent Events) format helpers
 │
 ├── llama-cpp-server/                 # AI inference engine container
@@ -1207,7 +1218,7 @@ To use a different GGUF model:
    ```
 3. Restart the stack: `docker compose restart llama-cpp gateway`
 
-**Important:** The Mistral chat template is hardcoded in `gateway/services/engine.py`. Other models (Llama 3, Phi-3, Gemma) use different templates. Edit `_format_mistral_prompt()` if you switch models.
+**Chat templates are auto-detected** from `MODEL_FILE` / `MODEL_NAME` — no code changes needed when switching models. Supported families: `mistral`, `llama3`, `qwen2`, `chatml`, `phi3`, `gemma`. Override auto-detection with `CHAT_TEMPLATE=<family>` in `.env` if needed.
 
 ---
 
@@ -1319,10 +1330,11 @@ Yes — any GGUF-format model that llama.cpp supports. Popular alternatives:
 - `Llama-3.2-3B-Instruct.Q4_K_M.gguf` — faster, less accurate, only 2 GB RAM
 - `Llama-3.1-8B-Instruct.Q4_K_M.gguf` — similar quality to Mistral, 5 GB RAM
 - `Phi-3.5-mini-instruct.Q4_K_M.gguf` — Microsoft's compact model, 2.5 GB RAM
+- `Qwen2.5-7B-Instruct-Q4_K_M.gguf` — strong alternative, 4.7 GB RAM
 
 Download from [HuggingFace TheBloke](https://huggingface.co/TheBloke) or [Bartowski's collection](https://huggingface.co/bartowski). After downloading, update `MODEL_FILE` and `MODEL_NAME` in `.env`.
 
-**Note:** Each model uses a different chat template. You will need to update `_format_mistral_prompt()` in `gateway/services/engine.py` to match your model's template.
+**Chat templates are auto-detected** from the model filename — no code changes needed. Set `CHAT_TEMPLATE=auto` (the default) and the gateway automatically picks the right prompt format for mistral, llama3, qwen2, phi3, or gemma models. You can also set it explicitly: `CHAT_TEMPLATE=llama3`.
 </details>
 
 <details>
