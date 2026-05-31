@@ -13,6 +13,14 @@ class Settings(BaseSettings):
     engine_port: int = 8001
     inference_backend: str = "llamacpp"
 
+    # Multi-model fleet — each model runs in its own llama.cpp backend
+    engine_mistral_host: str = "llama-cpp"
+    engine_mistral_port: int = 8001
+    engine_phi_host: str = "llama-cpp-phi"
+    engine_phi_port: int = 8001
+    engine_llama_host: str = "llama-cpp-llama"
+    engine_llama_port: int = 8001
+
     model_name: str = "mistral-7b"
     model_path: str = "/models/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
     context_length: int = 4096
@@ -25,7 +33,6 @@ class Settings(BaseSettings):
     chat_template: str = "auto"
 
     log_level: str = "INFO"
-    workers: int = 4
 
     redis_host: str = "redis"
     redis_port: int = 6379
@@ -35,8 +42,6 @@ class Settings(BaseSettings):
     cache_similarity_threshold: float = 0.95
 
     rate_limit_rpm: int = 60
-
-    alert_webhook_url: str = ""
 
 
 @lru_cache

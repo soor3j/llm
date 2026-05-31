@@ -15,8 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /llama.cpp
 
 # Pin to a specific commit for reproducibility
-# Commit: b3447 — stable release with llama-server included
-ARG LLAMA_CPP_COMMIT=b3447
+# Commit: b3878 — supports Llama 3.2, Phi-3.5, Mistral
+ARG LLAMA_CPP_COMMIT=b3878
 RUN git clone https://github.com/ggerganov/llama.cpp . && \
     git checkout ${LLAMA_CPP_COMMIT} 2>/dev/null || \
     git checkout main

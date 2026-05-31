@@ -27,4 +27,4 @@ Use FastAPI with uvicorn (async ASGI server).
 
 **Mitigation:**
 All I/O uses `httpx.AsyncClient`. The llama.cpp client, Redis client, and sentence-transformers embedding
-are all called with `await` or run at startup. Blocking calls are explicitly forbidden in `CLAUDE.md`.
+are all called with `await` or run at startup. Blocking calls are explicitly forbidden in the project coding rules.

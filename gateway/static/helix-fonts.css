@@ -1,0 +1,45 @@
+/* ============================================================================
+   helix-fonts.css — swap the Helix app's typeface to Anthropic Serif
+   Load AFTER helix-styles.css. Two optical sizes:
+     • "Anthropic Serif Display"  → large headings
+     • "Anthropic Serif"  (Text)  → body, UI, controls
+   Genuine monospace (code, specs, API paths, the credential field) is left as
+   JetBrains Mono on purpose — a proportional serif there would break alignment.
+   ============================================================================ */
+
+@font-face{font-family:"Anthropic Serif";font-weight:400;font-style:normal;font-display:swap;src:url("fonts/AnthropicSerif-Text-Regular-Static.otf") format("opentype");}
+@font-face{font-family:"Anthropic Serif";font-weight:400;font-style:italic;font-display:swap;src:url("fonts/AnthropicSerif-Text-RegularItalic-Static.otf") format("opentype");}
+@font-face{font-family:"Anthropic Serif";font-weight:500;font-style:normal;font-display:swap;src:url("fonts/AnthropicSerif-Text-Medium-Static.otf") format("opentype");}
+@font-face{font-family:"Anthropic Serif";font-weight:600;font-style:normal;font-display:swap;src:url("fonts/AnthropicSerif-Text-Semibold-Static.otf") format("opentype");}
+@font-face{font-family:"Anthropic Serif Display";font-weight:500;font-style:normal;font-display:swap;src:url("fonts/AnthropicSerif-Display-Medium-Static.otf") format("opentype");}
+@font-face{font-family:"Anthropic Serif Display";font-weight:600;font-style:normal;font-display:swap;src:url("fonts/AnthropicSerif-Display-Semibold-Static.otf") format("opentype");}
+
+:root{
+  --font-serif: 'Anthropic Serif', Georgia, 'Times New Roman', serif;
+  --font-serif-display: 'Anthropic Serif Display', Georgia, serif;
+}
+
+/* App-wide primary face (everything that uses Geist or inherits) */
+html, body{
+  font-family: var(--font-serif) !important;
+  font-feature-settings: normal;          /* drop Geist-specific ss01/cv11 */
+}
+
+/* Large headings → Display optical size */
+.h-hero,
+.h-section,
+.login-headline,
+.arch-detail h4{
+  font-family: var(--font-serif-display) !important;
+  letter-spacing: -0.025em;               /* serif needs a touch less negative tracking */
+}
+
+/* Controls & inputs inherit body, but pin them explicitly for safety */
+.btn, .nav-cta, .login-submit, .login-toggle-btn,
+.login-field input, .hero-eyebrow, .value-card h3, .arch-node .label{
+  font-family: var(--font-serif) !important;
+}
+
+/* Keep true monospace where it's structural/technical (NOT swapped):
+   .mono, .eyebrow, .caption, .viz-code, .arch-node .sub, .arch-detail .specs,
+   .hero-meta .key, and the credential field (.login-field + .login-field input). */

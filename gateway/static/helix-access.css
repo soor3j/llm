@@ -1,0 +1,228 @@
+/* ============================================================================
+   helix-access.css  —  REDESIGN of the "Access" scroll-emerge login scene
+   ----------------------------------------------------------------------------
+   Drop-in override. Load AFTER helix-styles.css; it restyles only the access
+   surface and reuses that file's :root tokens (--ink, --accent, --ease,
+   --ease-out, --dark-*, --radius-*).
+
+   Exact class contract (unchanged from helix-auth.jsx):
+     .emerge-zone › .emerge-overlay › {.emerge-grid, .emerge-horizon,
+        .login-panel(.admin) › {.login-headline, .login-card ›
+           {.login-toggle › (.login-toggle-thumb + .login-toggle-btn.on ×2),
+            .login-desc, .login-form › (.login-field>input ×2, .login-actions ›
+            .login-submit.primary + .login-submit.ghost)}}}
+     .minimal-footer
+
+   ⚠ The REVEAL is driven by INLINE styles from React (scroll progress sets
+     opacity / transform / filter on .login-panel & .login-headline, opacity on
+     .emerge-grid/.emerge-horizon, bg+backdrop on .emerge-overlay, and the thumb's
+     translateX). This stylesheet therefore uses NO @keyframes / animation-timeline
+     on those elements — only base styling + transitions — so it never fights the
+     inline reveal. Edit freely, but keep that rule.
+   ============================================================================ */
+
+:root{
+  /* local accents derived from the project's oklch blue token */
+  --hx-accent: oklch(0.62 0.16 248);
+  --hx-accent-bright: oklch(0.72 0.15 248);
+  --hx-glow: oklch(0.62 0.16 248 / 0.45);
+  --hx-glass: rgba(255,255,255,0.05);
+  --hx-glass-2: rgba(255,255,255,0.08);
+  --hx-stroke: rgba(255,255,255,0.10);
+  --hx-fg: #F4F4F7;
+  --hx-fg-dim: rgba(244,244,247,0.56);
+  --hx-fg-faint: rgba(244,244,247,0.34);
+}
+
+/* ── Overlay backdrop ──────────────────────────────────────────────────────
+   Inline JS owns opacity + background rgba + backdrop blur. We add a static
+   accent aura on top that the inline opacity multiplies through.            */
+.emerge-overlay{
+  /* keep their fixed/flex/center positioning from helix-styles.css */
+  isolation:isolate;
+}
+.emerge-overlay::before{
+  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(120% 80% at 50% -10%, oklch(0.62 0.16 248 / 0.16), transparent 55%),
+    radial-gradient(90% 70% at 50% 120%, oklch(0.62 0.16 248 / 0.10), transparent 60%);
+  mix-blend-mode:screen;
+}
+
+/* finer, calmer depth grid */
+.emerge-grid{
+  background-image:
+    linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px);
+  background-size:72px 72px;
+  -webkit-mask-image:radial-gradient(ellipse 62% 54% at 50% 46%, #000 0%, transparent 78%);
+          mask-image:radial-gradient(ellipse 62% 54% at 50% 46%, #000 0%, transparent 78%);
+}
+
+/* brighter, thinner accent horizon */
+.emerge-horizon{
+  height:1px;transform:translateY(150px);
+  background:linear-gradient(90deg, transparent 0%, var(--hx-accent-bright) 50%, transparent 100%);
+  filter:blur(0.4px) drop-shadow(0 0 8px var(--hx-glow));
+}
+
+/* ── Panel (outer wrapper; inline transform/opacity/filter drive reveal) ──── */
+.login-panel{ gap:30px; }
+
+/* headline — gradient ink, tighter (inline opacity drives its reveal) */
+.login-headline{
+  font-size:clamp(42px,5.2vw,60px);
+  font-weight:600;letter-spacing:-0.04em;line-height:0.96;
+  background:linear-gradient(180deg,#FFFFFF 28%, #9DA6BE 128%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+
+/* ── Card — gradient hairline frame, deep shadow, top sheen ───────────────── */
+.login-card{
+  position:relative;padding:30px;border-radius:22px;
+  background:linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.02)) , #0B0B10;
+  border:1px solid var(--hx-stroke);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.06) inset,
+    0 0 0 1px rgba(0,0,0,0.4),
+    0 44px 120px -44px rgba(0,0,0,0.92);
+  transition:border-color 320ms var(--ease), box-shadow 320ms var(--ease), background 420ms var(--ease);
+}
+/* top edge sheen */
+.login-card::before{
+  content:"";position:absolute;top:0;left:26px;right:26px;height:1px;border-radius:1px;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent);
+}
+.login-panel.admin .login-card{
+  border-color:oklch(0.7 0.16 248 / 0.34);
+  background:linear-gradient(180deg, oklch(0.62 0.16 248 / 0.08), rgba(255,255,255,0.015)) , #090A12;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.08) inset,
+    0 0 0 1px oklch(0.62 0.16 248 / 0.12),
+    0 44px 120px -44px oklch(0.50 0.16 248 / 0.55);
+}
+
+/* ── Segmented toggle ──────────────────────────────────────────────────────
+   Thumb position is INLINE (translateX 0/100%). We keep transition + restyle. */
+.login-toggle{
+  padding:4px;border-radius:13px;margin-bottom:22px;
+  background:rgba(0,0,0,0.34);
+  border:1px solid rgba(255,255,255,0.06);
+  box-shadow:0 1px 0 rgba(255,255,255,0.04) inset;
+}
+.login-toggle-thumb{
+  border-radius:10px;
+  background:linear-gradient(180deg, var(--hx-glass-2), rgba(255,255,255,0.03));
+  border:1px solid rgba(255,255,255,0.10);
+  box-shadow:0 6px 16px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.08) inset;
+  transition:transform 380ms var(--ease-out), background 280ms var(--ease), border-color 280ms var(--ease), box-shadow 280ms var(--ease);
+}
+.login-panel.admin .login-toggle-thumb{
+  background:linear-gradient(180deg, oklch(0.62 0.16 248 / 0.34), oklch(0.62 0.16 248 / 0.14));
+  border-color:oklch(0.74 0.15 248 / 0.55);
+  box-shadow:0 6px 20px var(--hx-glow), 0 1px 0 rgba(255,255,255,0.12) inset;
+}
+.login-toggle-btn{
+  height:38px;font-size:13.5px;font-weight:500;letter-spacing:-0.005em;
+  color:var(--hx-fg-faint);
+  transition:color 220ms var(--ease);
+}
+.login-toggle-btn.on{ color:var(--hx-fg); }
+.login-toggle-btn:hover{ color:var(--hx-fg-dim); }
+.login-toggle-btn.on:hover{ color:var(--hx-fg); }
+
+/* ── Description ───────────────────────────────────────────────────────────── */
+.login-desc{
+  margin:0 0 20px;text-align:center;
+  font-size:13px;line-height:1.5;color:var(--hx-fg-dim);letter-spacing:-0.005em;
+}
+
+/* ── Fields ────────────────────────────────────────────────────────────────── */
+.login-form{ gap:11px; }
+.login-field input{
+  height:47px;padding:0 15px;border-radius:12px;
+  background:rgba(0,0,0,0.30);
+  border:1px solid rgba(255,255,255,0.09);
+  color:var(--hx-fg);font-size:14px;letter-spacing:-0.005em;
+  transition:border-color 200ms var(--ease), background 200ms var(--ease), box-shadow 200ms var(--ease);
+}
+.login-field input::placeholder{ color:var(--hx-fg-faint); }
+.login-field input:focus{
+  outline:none;
+  border-color:rgba(255,255,255,0.26);
+  background:rgba(0,0,0,0.45);
+  box-shadow:0 0 0 4px rgba(255,255,255,0.05);
+}
+/* the second field (password / API key) reads as a credential → mono */
+.login-field + .login-field input{
+  font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size:13px;letter-spacing:0.01em;
+}
+.login-panel.admin .login-field input:focus{
+  border-color:var(--hx-accent-bright);
+  background:oklch(0.58 0.16 248 / 0.07);
+  box-shadow:0 0 0 4px oklch(0.62 0.16 248 / 0.16);
+}
+
+/* password reveal toggle — sits inside the credential field */
+.login-field:has(.login-reveal){ position:relative; }
+.login-field:has(.login-reveal) input{ padding-right:46px; }
+.login-reveal{
+  position:absolute; top:50%; right:7px; transform:translateY(-50%);
+  width:34px; height:34px; display:flex; align-items:center; justify-content:center;
+  padding:0; border:none; background:transparent; cursor:pointer; border-radius:9px;
+  color:var(--hx-fg-faint);
+  transition:color 180ms var(--ease), background 180ms var(--ease), transform 140ms var(--ease);
+}
+.login-reveal:hover{ color:var(--hx-fg-dim); background:rgba(255,255,255,0.06); }
+.login-reveal:active{ transform:translateY(-50%) scale(0.92); }
+.login-reveal:focus-visible{ outline:2px solid var(--hx-accent-bright); outline-offset:1px; color:var(--hx-fg); }
+.login-panel.admin .login-reveal[aria-pressed="true"]{ color:var(--hx-accent-bright); }
+
+/* ── Buttons ───────────────────────────────────────────────────────────────── */
+.login-actions{ grid-template-columns:1fr 1fr; gap:11px; margin-top:8px; }
+.login-submit{
+  height:47px;border-radius:12px;font-size:14px;font-weight:600;letter-spacing:-0.005em;
+  border:1px solid transparent;
+  transition:transform 160ms var(--ease), background 200ms var(--ease), border-color 200ms var(--ease), box-shadow 240ms var(--ease), filter 200ms var(--ease);
+}
+.login-submit:active{ transform:scale(0.985); }
+.login-submit:disabled{ opacity:0.55; cursor:default; }
+
+/* USER primary — luminous light key button */
+.login-submit.primary{
+  margin-top:8px;color:var(--ink);
+  background:linear-gradient(180deg,#FFFFFF,#E7E8EE);
+  box-shadow:0 8px 22px -10px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.9) inset;
+}
+.login-submit.primary:hover{ filter:brightness(1.03); transform:translateY(-1px); box-shadow:0 12px 28px -10px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.9) inset; }
+
+/* ADMIN primary — blue glow key button */
+.login-panel.admin .login-submit.primary{
+  color:#fff;
+  background:linear-gradient(180deg, oklch(0.66 0.16 248), oklch(0.56 0.16 248));
+  box-shadow:0 10px 26px -10px var(--hx-glow), 0 1px 0 rgba(255,255,255,0.28) inset;
+}
+.login-panel.admin .login-submit.primary:hover{ filter:brightness(1.06); transform:translateY(-1px); }
+
+/* ghost (Register) */
+.login-submit.ghost{
+  margin-top:8px;color:var(--hx-fg);
+  background:rgba(255,255,255,0.05);
+  border-color:rgba(255,255,255,0.10);
+}
+.login-submit.ghost:hover{ background:rgba(255,255,255,0.09); transform:translateY(-1px); }
+
+/* ── Minimal footer ──────────────────────────────────────────────────────────── */
+.minimal-footer-inner{ gap:16px; color:var(--hx-fg-faint); font-size:12.5px; }
+.minimal-footer a{ transition:color 220ms var(--ease); }
+.minimal-footer a:hover{ color:var(--hx-fg); }
+
+/* ── Reduced motion ──────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce){
+  .login-card,.login-toggle-thumb,.login-submit,.login-field input{ transition:none !important; }
+}
+
+@media (max-width:720px){
+  .login-card{ padding:24px;border-radius:20px; }
+}

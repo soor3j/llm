@@ -171,7 +171,10 @@ section { position: relative; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
+  width: 100% !important;
+  max-width: none !important;
+  padding: 0 32px !important;
+  box-sizing: border-box;
 }
 .brand {
   display: flex;
@@ -182,9 +185,10 @@ section { position: relative; }
   font-size: 16px;
 }
 .brand-mark {
-  width: 22px; height: 22px;
+  width: 56px; height: 56px;
   display: inline-flex;
   align-items: center; justify-content: center;
+  overflow: visible;
 }
 .nav-links {
   display: flex;
@@ -240,25 +244,6 @@ section { position: relative; }
   z-index: 2;
   width: 100%;
   text-align: center;
-}
-.hero-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 14px 7px 10px;
-  background: rgba(255,255,255,0.6);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  font-size: 12.5px;
-  color: var(--muted);
-  letter-spacing: -0.005em;
-  margin-bottom: 32px;
-  backdrop-filter: blur(8px);
-}
-.hero-eyebrow .dot {
-  width: 6px; height: 6px; border-radius: 999px;
-  background: oklch(0.65 0.18 145);
-  box-shadow: 0 0 0 4px oklch(0.65 0.18 145 / 0.18);
 }
 .hero h1 .line {
   display: block;
@@ -323,41 +308,6 @@ section { position: relative; }
 @keyframes fadeUp {
   from { transform: translateY(16px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
-}
-
-.scroll-indicator {
-  position: absolute;
-  bottom: 32px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  color: var(--muted-2);
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  opacity: 0;
-  animation: fadeUp 900ms var(--ease-out) 900ms forwards;
-}
-.scroll-indicator .bar {
-  width: 1px;
-  height: 36px;
-  background: linear-gradient(180deg, transparent, var(--muted-2));
-  position: relative;
-  overflow: hidden;
-}
-.scroll-indicator .bar::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, transparent, var(--ink));
-  animation: drip 1800ms var(--ease-out) infinite;
-}
-@keyframes drip {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100%); }
 }
 
 /* Hero animated mesh */
@@ -894,7 +844,7 @@ section { position: relative; }
   .login-headline { font-size: 36px; }
 }
 
-/* Minimal footer — only GitHub · Docs · API Reference */
+/* Minimal footer — single GitHub link */
 .minimal-footer {
   position: relative;
   z-index: 40;
@@ -916,7 +866,6 @@ section { position: relative; }
   transition: color 220ms var(--ease);
 }
 .minimal-footer a:hover { color: #F2F2F5; }
-.minimal-footer .dot-sep { color: rgba(242,242,245,0.25); }
 
 
 /* Reveal-on-scroll util */
@@ -928,28 +877,6 @@ section { position: relative; }
 .reveal.in {
   opacity: 1;
   transform: translateY(0);
-}
-
-/* Architecture diagram svg lines */
-.arch-flow {
-  position: absolute;
-  top: 0; left: 0;
-  pointer-events: none;
-  width: 100%;
-  height: 100%;
-}
-
-/* Section header (centered variant) */
-.section-head.center {
-  margin-left: auto;
-  margin-right: auto;
-  text-align: center;
-  align-items: center;
-}
-
-/* Transition blur effect for sections nearing auth */
-.blur-on-scroll {
-  transition: filter 400ms var(--ease);
 }
 
 /* Selection */

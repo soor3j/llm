@@ -46,6 +46,7 @@ const LoginPanel = ({ progress, onAuth }) => {
   const [busy, setBusy] = React.useState(false);
   const idRef = React.useRef(null);
   const pwRef = React.useRef(null);
+  const [showPw, setShowPw] = React.useState(false);
 
   // Submission flow:
   //   Admin tab  → cosmetic: store typed password as adminApiKey.
@@ -184,13 +185,40 @@ const LoginPanel = ({ progress, onAuth }) => {
               autoComplete={isAdmin ? 'username' : 'email'}
             />
           </div>
-          <div className="login-field">
+          <div className="login-field" style={{ position: 'relative' }}>
             <input
               ref={pwRef}
-              type="password"
+              type={showPw ? 'text' : 'password'}
               placeholder={isAdmin ? 'ADMIN_API_KEY value' : 'Password'}
               autoComplete={isAdmin ? 'current-password' : 'new-password'}
+              style={{ paddingRight: 46 }}
             />
+            <button
+              type="button"
+              className="login-reveal"
+              onClick={() => setShowPw((s) => !s)}
+              aria-label={showPw ? 'Hide password' : 'Show password'}
+              aria-pressed={showPw}
+              title={showPw ? 'Hide' : 'Show'}
+              style={{
+                position: 'absolute', top: '50%', right: 7, transform: 'translateY(-50%)',
+                width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
+                borderRadius: 9, color: 'rgba(244,244,247,0.6)', zIndex: 2,
+              }}
+            >
+              {showPw ? (
+                <svg width="17" height="17" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                  <path d="M2 2 L16 16" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                  <path d="M7.4 7.5 a2.2 2.2 0 0 0 3.1 3.1 M4.3 4.8 C2.9 5.7 1.8 7 1 8.5 C2.6 11.7 5.5 13.5 9 13.5 C10.2 13.5 11.3 13.3 12.3 12.9 M14.1 11.5 C15.1 10.7 15.9 9.7 16.5 8.5 C14.9 5.3 12 3.5 9 3.5 C8.4 3.5 7.9 3.6 7.3 3.7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ) : (
+                <svg width="17" height="17" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                  <path d="M1 8.5 C2.6 5.3 5.5 3.5 9 3.5 C12.5 3.5 15.4 5.3 17 8.5 C15.4 11.7 12.5 13.5 9 13.5 C5.5 13.5 2.6 11.7 1 8.5 Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+                  <circle cx="9" cy="8.5" r="2.4" stroke="currentColor" strokeWidth="1.4" />
+                </svg>
+              )}
+            </button>
           </div>
 
           {errorMsg && (
@@ -268,11 +296,7 @@ const ScrollLogin = ({ onProgressChange, onAuth }) => {
 const MinimalFooter = () => (
   <footer className="minimal-footer">
     <div className="container minimal-footer-inner">
-      <a href="#">GitHub</a>
-      <span className="dot-sep" aria-hidden="true">·</span>
-      <a href="#">Docs</a>
-      <span className="dot-sep" aria-hidden="true">·</span>
-      <a href="#">API Reference</a>
+      <a href="https://github.com/soor3j" target="_blank" rel="noopener noreferrer">GitHub</a>
     </div>
   </footer>
 );

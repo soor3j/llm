@@ -52,7 +52,6 @@ function App() {
     <React.Fragment>
       <Nav dark={darkNav} scrolled={scrolled} onSignIn={scrollToLogin} />
       <Hero />
-      <ValueCards />
       <Architecture />
       <ScrollLogin onProgressChange={setLoginProgress} onAuth={handleAuth} />
       <MinimalFooter />

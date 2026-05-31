@@ -83,7 +83,13 @@ async def chat_completions(
     api_key: str = Depends(verify_api_key),
     settings: Settings = Depends(get_settings),
 ):
-    engine = request.app.state.engine_client
+    # Multi-model fleet — route to the backend that owns this model.
+    # Falls back to the default engine_client if registry isn't initialized.
+    registry = getattr(request.app.state, "model_registry", None)
+    if registry is not None:
+        engine = registry.get(request_body.model)
+    else:
+        engine = request.app.state.engine_client
     cache = getattr(request.app.state, "cache", None)
     tracker = getattr(request.app.state, "queue_tracker", None)
     model = request_body.model

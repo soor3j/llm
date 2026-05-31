@@ -16,6 +16,25 @@ No cloud API costs. No data leaving your machine. Full observability included.
 
 ---
 
+## Screenshots
+
+### Landing & Auth
+| Home | Architecture | Sign In (User) | Sign In (Admin) |
+|------|-------------|----------------|-----------------|
+| ![Home](docs/screenshots/Home.png) | ![Architecture](docs/screenshots/Architecture.png) | ![User Login](docs/screenshots/UserAcc.png) | ![Admin Login](docs/screenshots/AdminAcc.png) |
+
+### User Workspace
+| New Chat | Chat in Action | Document Upload | API Reference | Chat History | Settings |
+|----------|---------------|-----------------|---------------|--------------|----------|
+| ![New Chat](docs/screenshots/ChatDefault.png) | ![Chat](docs/screenshots/ChatQn.png) | ![Documents](docs/screenshots/DocUpload.png) | ![API](docs/screenshots/API.png) | ![History](docs/screenshots/ChatHistoy.png) | ![Settings](docs/screenshots/Setting.png) |
+
+### Admin Console
+| Overview | Metrics | Queue | Cache | Models |
+|----------|---------|-------|-------|--------|
+| ![Overview](docs/screenshots/AdminOverview.png) | ![Metrics](docs/screenshots/AdminMetrics.png) | ![Queue](docs/screenshots/AdminQueue.png) | ![Cache](docs/screenshots/AdminCache.png) | ![Models](docs/screenshots/AdminModels.png) |
+
+---
+
 ## What Is This? (Non-Technical Explanation)
 
 > **Skip to [Quickstart](#quickstart-5-minutes) if you already know what LLMs are.**
@@ -1482,7 +1501,7 @@ Ollama and LM Studio are excellent for personal local use. This project is desig
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feat/your-feature`
-3. Make your changes following the coding rules in `.claude/CLAUDE.md`
+3. Make your changes following the project coding rules
 4. Run tests: `pytest tests/ -v`
 5. Run linters: `ruff check . && black --check .`
 6. Submit a pull request

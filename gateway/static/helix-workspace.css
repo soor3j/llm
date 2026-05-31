@@ -3,6 +3,43 @@
    Mounted as a fixed full-viewport layer with an entry animation
    (opacity 0→1, scale 0.98→1, blur 12→0). */
 
+/* Light theme override — applied via data-theme="light" on <html> */
+[data-theme="light"] .workspace {
+  background: #F5F5F7;
+  color: #0A0A0B;
+}
+[data-theme="light"] .ws-topbar {
+  background: rgba(245,245,247,0.85);
+  border-bottom-color: rgba(10,10,11,0.08);
+}
+[data-theme="light"] .ws-sidebar {
+  background: #EBEBED;
+  border-right-color: rgba(10,10,11,0.08);
+}
+[data-theme="light"] .ws-side-item { color: #3C3C3E; }
+[data-theme="light"] .ws-side-item:hover { background: rgba(10,10,11,0.06); }
+[data-theme="light"] .ws-side-item.on { background: rgba(10,10,11,0.10); color: #0A0A0B; }
+[data-theme="light"] .ws-side-foot { color: #6E6E73; border-top-color: rgba(10,10,11,0.08); }
+[data-theme="light"] .ws-main { background: #F5F5F7; }
+[data-theme="light"] .ws-chat-head { border-bottom-color: rgba(10,10,11,0.08); color: #0A0A0B; }
+[data-theme="light"] .ws-chat-sub { color: rgba(10,10,11,0.45); }
+[data-theme="light"] .ws-brand-name { color: #0A0A0B; }
+[data-theme="light"] .ws-messages { background: #F5F5F7; }
+[data-theme="light"] .ws-bubble { background: #fff; color: #0A0A0B; border-color: rgba(10,10,11,0.08); }
+[data-theme="light"] .ws-msg.user .ws-bubble { background: #0A0A0B; color: #F2F2F5; }
+[data-theme="light"] .ws-input-wrap { background: #EBEBED; border-top-color: rgba(10,10,11,0.08); }
+[data-theme="light"] .ws-input { background: #fff; color: #0A0A0B; border-color: rgba(10,10,11,0.12); }
+[data-theme="light"] .ws-chip { background: rgba(10,10,11,0.06); color: #3C3C3E; border-color: rgba(10,10,11,0.10); }
+[data-theme="light"] .ws-chip.on { background: #0A0A0B; color: #fff; border-color: #0A0A0B; }
+[data-theme="light"] .ws-send { background: #0A0A0B; }
+[data-theme="light"] .ws-view { color: #0A0A0B; }
+[data-theme="light"] .ws-view-head p { color: #6E6E73; }
+[data-theme="light"] .ws-rail { background: #EBEBED; border-left-color: rgba(10,10,11,0.08); }
+[data-theme="light"] .ws-metric-label { color: rgba(10,10,11,0.5); }
+[data-theme="light"] .ws-metric-val { color: #0A0A0B; }
+[data-theme="light"] .ws-icon-btn { color: #6E6E73; border-color: rgba(10,10,11,0.10); }
+[data-theme="light"] .ws-icon-btn:hover { background: rgba(10,10,11,0.06); }
+
 .workspace {
   position: fixed;
   inset: 0;
@@ -43,8 +80,8 @@
 
 .ws-topbar {
   height: 56px;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
   padding: 0 20px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
@@ -292,20 +329,21 @@
   min-height: 0;
 }
 .ws-chat-head {
-  padding: 22px 40px 18px;
+  padding: 10px 40px 8px;
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 16px;
   border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 .ws-chat-title {
-  font-size: 18px;
+  font-size: 13px;
   font-weight: 500;
   letter-spacing: -0.015em;
 }
 .ws-chat-sub {
-  margin-top: 4px;
+  margin-top: 1px;
+  font-size: 10px;
   color: rgba(242,242,245,0.45);
 }
 .ws-chat-head-actions { display: flex; gap: 6px; }
@@ -783,39 +821,6 @@
   white-space: nowrap;
 }
 
-/* Metrics view (user) */
-.ws-metric-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-}
-.ws-metric-card {
-  padding: 22px;
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 16px;
-  background: rgba(255,255,255,0.02);
-}
-.ws-metric-card-label {
-  font-size: 12px;
-  color: rgba(242,242,245,0.5);
-  margin-bottom: 6px;
-}
-.ws-metric-card-val {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 32px;
-  font-weight: 500;
-  color: #F2F2F5;
-  letter-spacing: -0.02em;
-  font-feature-settings: "tnum";
-  margin-bottom: 12px;
-}
-.ws-metric-card-val .unit {
-  font-size: 0.55em;
-  color: rgba(242,242,245,0.4);
-  margin-left: 4px;
-  font-weight: 400;
-}
-
 /* Settings */
 .ws-settings {
   border: 1px solid rgba(255,255,255,0.06);
@@ -982,27 +987,27 @@
 }
 .adm-overview-grid.three { grid-template-columns: repeat(3, 1fr); }
 .adm-card {
-  padding: 20px;
+  padding: 12px 14px;
   border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 16px;
+  border-radius: 12px;
   background: rgba(255,255,255,0.02);
   opacity: 0;
   animation: fadeUp 600ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 .adm-card-label {
-  font-size: 12px;
+  font-size: 11px;
   color: rgba(242,242,245,0.5);
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 .adm-card-row {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 .adm-card-val {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 30px;
+  font-size: 22px;
   font-weight: 500;
   color: #F2F2F5;
   letter-spacing: -0.02em;
@@ -1025,9 +1030,10 @@
   display: grid;
   grid-template-columns: 1.4fr 1fr;
   gap: 12px;
+  align-items: start;
 }
 .adm-panel {
-  padding: 22px;
+  padding: 14px 18px;
   border: 1px solid rgba(255,255,255,0.06);
   border-radius: 16px;
   background: rgba(255,255,255,0.02);
@@ -1045,7 +1051,7 @@
   letter-spacing: -0.005em;
 }
 .adm-panel-head .small { color: rgba(242,242,245,0.45); }
-.adm-bigchart { height: 180px; }
+.adm-bigchart { height: 60px; }
 .adm-svg { width: 100%; height: 100%; display: block; }
 
 /* Tenants */
@@ -1221,5 +1227,4 @@
   .adm-overview-grid { grid-template-columns: 1fr; }
   .ws-tr, .adm-log-row { grid-template-columns: 1fr; gap: 4px; padding: 12px 16px; }
   .ws-tr.head, .adm-log-row.head { display: none; }
-  .ws-metric-grid { grid-template-columns: 1fr; }
 }

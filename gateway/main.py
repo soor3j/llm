@@ -19,6 +19,7 @@ from gateway.routers import (
     models,
 )
 from gateway.services.engine import LlamaCppClient
+from gateway.services.model_registry import ModelRegistry
 from gateway.services.queue_tracker import QueueTracker
 
 log = structlog.get_logger()
@@ -49,13 +50,10 @@ async def lifespan(app: FastAPI):
 
     log.info("server_starting", backend=settings.inference_backend, model=settings.model_name)
 
-    app.state.engine_client = LlamaCppClient(
-        host=settings.engine_host,
-        port=settings.engine_port,
-        chat_template=settings.chat_template,
-        model_name=settings.model_name,
-        model_path=settings.model_path,
-    )
+    # Multi-model fleet — one llama.cpp backend per model, all pre-loaded.
+    # engine_client stays for legacy code paths that don't pass a model name.
+    app.state.model_registry = ModelRegistry(settings)
+    app.state.engine_client = app.state.model_registry.get(settings.model_name)
     app.state.inference_backend = settings.inference_backend
 
     # In-memory queue tracker — always available, no external deps.

@@ -17,28 +17,14 @@ const apiBase = () => `${window.location.origin}/v1`;
 // configurable swaps the operator can drop into the model directory.
 const MODELS = [
   { id: 'mistral-7b', name: 'Mistral 7B Instruct', tag: 'instruct', ctx: 4096, backend: 'llama.cpp', quant: 'Q4_K_M', status: 'loaded', size: '4.1 GB' },
-  { id: 'phi-3.5-mini', name: 'Phi-3.5 Mini', tag: 'reasoning', ctx: 4096, backend: 'llama.cpp', quant: 'Q4_K_M', status: 'cold', size: '2.4 GB' },
-  { id: 'llama-3.2-3b', name: 'Llama 3.2 3B', tag: 'chat', ctx: 4096, backend: 'llama.cpp', quant: 'Q4_K_M', status: 'cold', size: '2.0 GB' },
+  { id: 'phi-3.5-mini', name: 'Phi-3.5 Mini', tag: 'reasoning', ctx: 4096, backend: 'llama.cpp', quant: 'Q4_K_M', status: 'loaded', size: '2.4 GB' },
+  { id: 'llama-3.2-3b', name: 'Llama 3.2 3B', tag: 'chat', ctx: 4096, backend: 'llama.cpp', quant: 'Q4_K_M', status: 'loaded', size: '2.0 GB' },
 ];
 
 // Used as a friendly initial greeting only — real replies come from the engine.
-const SAMPLE_REPLIES = [
-  "I'm running locally on this machine. Ask me anything — your prompt never leaves the host.",
-];
-
-const SAMPLE_CHATS = [
-  { id: 'c1', title: 'Streaming tokens & SSE', when: '2m', preview: 'How does Helix route a request…' },
-  { id: 'c2', title: 'Cold-start vs warm pool', when: '1h', preview: 'Why is my 70B cold start…' },
-  { id: 'c3', title: 'OpenAI compat checklist', when: 'Yesterday', preview: 'Does function calling work…' },
-  { id: 'c4', title: 'AWQ vs FP8 tradeoff', when: 'Mon', preview: 'Quant pick for 70B chat…' },
-  { id: 'c5', title: 'Quota & fair-share', when: 'Mar 14', preview: 'How is fairness enforced…' },
-];
-
 const SIDEBAR_ITEMS = [
   { id: 'chat', label: 'Chats', icon: Icon.Stream },
-  { id: 'models', label: 'Models', icon: Icon.Chip },
   { id: 'documents', label: 'Documents', icon: Icon.Globe },
-  { id: 'metrics', label: 'Metrics', icon: Icon.Pulse },
   { id: 'api', label: 'API', icon: Icon.Network },
   { id: 'history', label: 'History', icon: Icon.Queue },
   { id: 'settings', label: 'Settings', icon: Icon.Lock },
@@ -81,53 +67,18 @@ const WsTopBar = ({ model, setModel, onSignOut }) => {
       <div className="ws-topbar-left">
         <div className="ws-brand">
           <BrandMark dark size={20} />
-          <span className="ws-brand-name">Inference</span>
-          <span className="ws-divider" />
-          <span className="ws-project">local · single-node</span>
+          <span className="ws-brand-name">LLM Inference Server</span>
         </div>
       </div>
 
-      <div className="ws-topbar-center">
-        <button
-          className={`ws-model ${open ? 'open' : ''}`}
-          onClick={() => setOpen((v) => !v)}
-        >
-          <span className="ws-model-dot" />
-          <span className="ws-model-name">{model.name}</span>
-          <span className="ws-model-meta">{model.backend} · {model.quant} · {model.ctx.toLocaleString()}</span>
-          <Icon.Down size={12} />
-        </button>
-        {open && (
-          <div className="ws-model-menu" onMouseLeave={() => setOpen(false)}>
-            {MODELS.map((m) => (
-              <button
-                key={m.id}
-                className={`ws-model-item ${m.id === model.id ? 'on' : ''}`}
-                onClick={() => { setModel(m); setOpen(false); }}
-              >
-                <span className={`ws-model-dot ${m.status === 'loaded' ? 'on' : 'off'}`} />
-                <div className="ws-model-item-meta">
-                  <div className="ws-model-item-name">{m.name}</div>
-                  <div className="ws-model-item-sub">{m.backend} · {m.quant} · ctx {m.ctx.toLocaleString()}</div>
-                </div>
-                <span className="ws-model-item-status">{m.status}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
 
       <div className="ws-topbar-right">
-        <div className="ws-health">
-          <span className={`ws-dot ${health.status === 'ok' ? 'on' : health.status === 'degraded' ? 'idle' : 'off'}`} />
-          <span>Engine</span>
-          <span className="ws-divider" />
-          <span className="mono">
-            {health.latencyMs != null ? <>{health.latencyMs}<small>ms</small></> : '—'}
-          </span>
-        </div>
-        <button className="ws-avatar" onClick={onSignOut} title="Sign out">
-          <span>A</span>
+        <button
+          onClick={onSignOut}
+          title="Sign out"
+          style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}
+        >
+          <img src="icon3.png" alt="logout" style={{ width: 26, height: 26, objectFit: 'contain', display: 'block' }} />
         </button>
       </div>
     </header>
@@ -136,68 +87,60 @@ const WsTopBar = ({ model, setModel, onSignOut }) => {
 
 // --- Sidebar -------------------------------------------------------
 
-const WsSidebar = ({ active, setActive }) => (
-  <aside className="ws-sidebar">
-    <nav className="ws-side-nav">
-      {SIDEBAR_ITEMS.map((it) => {
-        const Ico = it.icon;
-        return (
-          <button
-            key={it.id}
-            className={`ws-side-item ${active === it.id ? 'on' : ''}`}
-            onClick={() => setActive(it.id)}
-          >
-            <span className="ws-side-ico"><Ico size={15} /></span>
-            <span>{it.label}</span>
-          </button>
-        );
-      })}
-    </nav>
-    <div className="ws-side-foot">
-      <div className="ws-side-foot-row">
-        <span className="ws-dot on" />
-        <span>All systems healthy</span>
-      </div>
-      <div className="ws-side-foot-row mono small">v2.4.1 · a2c7d1</div>
-    </div>
-  </aside>
-);
+// Real health probe — polls /health/full every 10s and shows actual status.
+const useFleetHealth = () => {
+  const [state, setState] = React.useState({ status: 'checking', degraded: [] });
+  React.useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const res = await fetch('/health/full');
+        const j = await res.json();
+        if (!cancelled) setState({ status: j.status, degraded: j.degraded || [] });
+      } catch {
+        if (!cancelled) setState({ status: 'degraded', degraded: ['gateway'] });
+      }
+    };
+    tick();
+    const id = setInterval(tick, 10000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+  return state;
+};
 
-// --- Sparkline -----------------------------------------------------
-
-const Sparkline = ({ seed = '', w = 86, h = 26, stroke = 'rgba(242,242,245,0.45)' }) => {
-  const points = React.useMemo(() => {
-    let s = 1;
-    for (let i = 0; i < seed.length; i++) s = (s + seed.charCodeAt(i) * 31) % 100000;
-    const out = [];
-    for (let i = 0; i < 22; i++) {
-      s = (s * 9301 + 49297) % 233280;
-      out.push(s / 233280);
-    }
-    return out;
-  }, [seed]);
-  const path = points
-    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${(i / (points.length - 1)) * w} ${h - p * (h - 2) - 1}`)
-    .join(' ');
-  const last = points[points.length - 1];
+const WsSidebar = ({ active, setActive }) => {
+  const health = useFleetHealth();
+  const ok = health.status === 'ok';
+  const checking = health.status === 'checking';
   return (
-    <svg width={w} height={h} className="ws-spark" viewBox={`0 0 ${w} ${h}`}>
-      <path d={path} stroke={stroke} strokeWidth="1" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={w} cy={h - last * (h - 2) - 1} r="1.6" fill={stroke} />
-    </svg>
+    <aside className="ws-sidebar">
+      <nav className="ws-side-nav">
+        {SIDEBAR_ITEMS.map((it) => {
+          const Ico = it.icon;
+          return (
+            <button
+              key={it.id}
+              className={`ws-side-item ${active === it.id ? 'on' : ''}`}
+              onClick={() => setActive(it.id)}
+            >
+              <span className="ws-side-ico"><Ico size={15} /></span>
+              <span>{it.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+      <div className="ws-side-foot">
+        <div className="ws-side-foot-row" title={health.degraded.length ? `Down: ${health.degraded.join(', ')}` : ''}>
+          <span className={`ws-dot ${ok ? 'on' : checking ? 'idle' : 'off'}`} />
+          <span>{checking ? 'Checking…' : ok ? 'All systems healthy' : `Degraded · ${health.degraded.length} down`}</span>
+        </div>
+        <div className="ws-side-foot-row mono small">v1.1</div>
+      </div>
+    </aside>
   );
 };
 
 // --- Metrics rail --------------------------------------------------
-
-const useTicker = (interval = 1200) => {
-  const [t, setT] = React.useState(0);
-  React.useEffect(() => {
-    const id = setInterval(() => setT((x) => x + 1), interval);
-    return () => clearInterval(id);
-  }, [interval]);
-  return t;
-};
 
 // Hook: poll /v1/metrics/summary every 2s while mounted.
 const useMetricsSummary = (intervalMs = 2000) => {
@@ -261,7 +204,6 @@ const MetricsRail = ({ collapsed, onToggle }) => {
               {m.unit && <span className="unit">{m.unit}</span>}
             </div>
           </div>
-          <Sparkline seed={`${m.label}-${summary?.uptime_sec || 0}-${i}`} />
         </div>
       ))}
       <div className="ws-rail-foot">
@@ -284,13 +226,14 @@ const INITIAL_GREETING = {
   content: 'Hi — the engine is online and the model is loaded. What would you like to ask?',
 };
 
-const ChatView = ({ model, chatId, setChatId, onNewChat }) => {
+const ChatView = ({ model, setModel, chatId, setChatId, onNewChat, params, setParams }) => {
   const [messages, setMessages] = React.useState([INITIAL_GREETING]);
   const [title, setTitle] = React.useState('New chat');
   const [prompt, setPrompt] = React.useState('');
   const [streaming, setStreaming] = React.useState(false);
   const [loadingChat, setLoadingChat] = React.useState(false);
-  const [params, setParams] = React.useState({ temperature: 0.7, maxTokens: 512, streaming: true, useRag: false });
+  const [showModelMenu, setShowModelMenu] = React.useState(false);
+  const [showTempMenu, setShowTempMenu] = React.useState(false);
   const messagesRef = React.useRef(null);
   const abortRef = React.useRef(null);
   // Only the FIRST time the workspace mounts with no chatId do we auto-pick
@@ -549,7 +492,9 @@ const ChatView = ({ model, chatId, setChatId, onNewChat }) => {
         {messages.map((m, i) => (
           <div key={i} className={`ws-msg ${m.role}`}>
             {m.role === 'assistant' && (
-              <div className="ws-msg-avatar"><BrandMark dark size={14} /></div>
+              <div className="ws-msg-avatar" style={{ background: 'transparent', border: 'none' }}>
+                <img src="favicon.png" alt="" style={{ width: 24, height: 24, objectFit: 'contain', display: 'block' }} />
+              </div>
             )}
             <div className="ws-msg-body">
               {m.role === 'user' ? (
@@ -582,15 +527,41 @@ const ChatView = ({ model, chatId, setChatId, onNewChat }) => {
           />
           <div className="ws-input-bar">
             <div className="ws-input-controls">
-              <button className="ws-chip" title="Attach">
-                <span className="mono">+</span> attach
-              </button>
-              <button className="ws-chip">
-                temp <span className="mono">{params.temperature.toFixed(1)}</span>
-              </button>
-              <button className="ws-chip">
-                max <span className="mono">{params.maxTokens}</span>
-              </button>
+              <div style={{ position: 'relative' }}>
+                <button
+                  className="ws-chip"
+                  onClick={() => setShowTempMenu(!showTempMenu)}
+                >
+                  temp <span className="mono">{params.temperature.toFixed(2)}</span>
+                </button>
+                {showTempMenu && (
+                  <div style={{
+                    position: 'absolute', bottom: '100%', left: 0, marginBottom: '4px',
+                    background: '#1c1c1e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px',
+                    padding: '12px 14px', minWidth: '220px', zIndex: 100,
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                    fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, sans-serif"
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#a1a1a6', marginBottom: '6px' }}>
+                      <span>Temperature</span>
+                      <span className="mono" style={{ color: '#f2f2f5' }}>{params.temperature.toFixed(2)}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={params.temperature}
+                      onChange={(e) => setParams((p) => ({ ...p, temperature: parseFloat(e.target.value) }))}
+                      style={{ width: '100%', accentColor: '#f2f2f5' }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#71717a', marginTop: '4px' }}>
+                      <span>precise</span>
+                      <span>creative</span>
+                    </div>
+                  </div>
+                )}
+              </div>
               <button
                 className={`ws-chip ${params.streaming ? 'on' : ''}`}
                 onClick={() => setParams((p) => ({ ...p, streaming: !p.streaming }))}
@@ -604,9 +575,49 @@ const ChatView = ({ model, chatId, setChatId, onNewChat }) => {
               >
                 use docs {params.useRag ? 'on' : 'off'}
               </button>
-              <button className="ws-chip">
-                ctx <span className="mono">{model.ctx.toLocaleString()}</span>
-              </button>
+              <div style={{ position: 'relative' }}>
+                <button
+                  className="ws-chip"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, sans-serif" }}
+                  onClick={() => setShowModelMenu(!showModelMenu)}
+                >
+                  {model.name}
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                    <path d="M2 4l4 4 4-4z" />
+                  </svg>
+                </button>
+                {showModelMenu && (
+                  <div style={{
+                    position: 'absolute', bottom: '100%', left: 0, marginBottom: '4px',
+                    background: '#1c1c1e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px',
+                    minWidth: '160px', zIndex: 100, boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
+                  }}>
+                    {MODELS.map((m) => (
+                      <button
+                        key={m.id}
+                        style={{
+                          display: 'block', width: '100%', padding: '10px 12px', border: 'none',
+                          background: m.id === model.id ? 'rgba(255,255,255,0.1)' : 'transparent',
+                          color: m.id === model.id ? '#f2f2f5' : '#a1a1a6',
+                          textAlign: 'left', cursor: 'pointer', fontSize: '13px',
+                          borderBottom: m.id !== MODELS[MODELS.length-1].id ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                          fontWeight: m.id === model.id ? '500' : '400',
+                          transition: 'all 120ms ease',
+                          fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, sans-serif"
+                        }}
+                        onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.05)'}
+                        onMouseLeave={(e) => e.target.style.background = m.id === model.id ? 'rgba(255,255,255,0.1)' : 'transparent'}
+                        onClick={() => {
+                          setModel(m);
+                          setShowModelMenu(false);
+                        }}
+                      >
+                        {m.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             <button
               className="ws-send"
@@ -618,66 +629,6 @@ const ChatView = ({ model, chatId, setChatId, onNewChat }) => {
             </button>
           </div>
         </div>
-      </div>
-    </section>
-  );
-};
-
-// --- Models view ---------------------------------------------------
-
-const ModelsView = () => {
-  const [loaded, setLoaded] = React.useState([]);
-  const [err, setErr] = React.useState(null);
-
-  React.useEffect(() => {
-    const apiKey = getApiKey();
-    fetch(`${apiBase()}/models`, { headers: { Authorization: `Bearer ${apiKey}` } })
-      .then((r) => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
-      .then((j) => setLoaded((j?.data || []).map((m) => m.id)))
-      .catch((e) => setErr(e.message));
-  }, []);
-
-  // Merge live status from /v1/models into the static config table.
-  const rows = MODELS.map((m) => ({
-    ...m,
-    status: loaded.includes(m.id) ? 'loaded' : m.status,
-  }));
-
-  return (
-    <section className="ws-view">
-      <div className="ws-view-head">
-        <h2>Models</h2>
-        <p>
-          {err
-            ? <span style={{ color: 'oklch(0.78 0.16 25)' }}>Could not reach /v1/models: {err}</span>
-            : 'Checkpoints configured for this stack. One is loaded at a time — controlled by MODEL_FILE in .env.'}
-        </p>
-      </div>
-      <div className="ws-table">
-        <div className="ws-tr head">
-          <span>Model</span>
-          <span>Backend</span>
-          <span>Quant</span>
-          <span>Context</span>
-          <span>Size</span>
-          <span>Status</span>
-        </div>
-        {rows.map((m) => (
-          <div className="ws-tr" key={m.id}>
-            <span className="ws-tr-model">
-              <strong>{m.name}</strong>
-              <small className="mono">{m.id}</small>
-            </span>
-            <span className="mono">{m.backend}</span>
-            <span className="mono">{m.quant}</span>
-            <span className="mono">{m.ctx.toLocaleString()}</span>
-            <span className="mono">{m.size}</span>
-            <span className={`ws-status-pill ${m.status}`}>
-              <span className={`ws-dot ${m.status === 'loaded' ? 'on' : 'off'}`} />
-              {m.status}
-            </span>
-          </div>
-        ))}
       </div>
     </section>
   );
@@ -857,9 +808,9 @@ const DocumentsView = () => {
       <div className="ws-view-head">
         <h2>Documents</h2>
         <p>
-          Upload reference material — the chat can pull from it via retrieval-augmented
+          Upload reference material, the chat can pull from it via retrieval-augmented
           generation (toggle <span className="mono">use docs</span> in the input bar).
-          Plain-text and Markdown only for now.
+          Plain-text and Markdown only.
         </p>
       </div>
 
@@ -880,7 +831,11 @@ const DocumentsView = () => {
                 fontFamily: 'inherit', fontSize: 13,
               }}
             />
-            <label className="ws-set-btn" style={{ cursor: 'pointer' }}>
+            <label className="ws-set-btn" style={{
+              cursor: 'pointer', display: 'inline-flex', alignItems: 'center',
+              justifyContent: 'center', height: 36, padding: '0 16px',
+              whiteSpace: 'nowrap'
+            }}>
               Pick file
               <input type="file" accept=".txt,.md,text/*" onChange={onFile} style={{ display: 'none' }} />
             </label>
@@ -1032,44 +987,25 @@ const HistoryView = ({ openChat }) => {
   );
 };
 
-const MetricsView = () => {
-  const [summary, err] = useMetricsSummary(2000);
-  const cards = [
-    { label: 'Tokens / second',     value: summary?.tokens_per_sec ?? '—',                                  spark: 'tps' },
-    { label: 'Time to first token', value: summary?.ttft_mean_ms ?? '—', unit: 'ms',                       spark: 'ttft' },
-    { label: 'Requests / minute',   value: summary?.requests_per_min ?? '—',                                spark: 'rpm' },
-    { label: 'Cache hit rate',      value: summary ? Math.round((summary.cache_hit_rate ?? 0) * 100) : '—', unit: '%', spark: 'cache' },
-    { label: 'Total requests',      value: summary?.total_requests ?? '—',                                  spark: 'total' },
-    { label: 'Errors',              value: summary?.errors ?? '—',                                          spark: 'err' },
-  ];
-  return (
-    <section className="ws-view">
-      <div className="ws-view-head">
-        <h2>Metrics</h2>
-        <p>
-          {err
-            ? <span style={{ color: 'oklch(0.78 0.16 25)' }}>Could not reach /v1/metrics/summary: {err}</span>
-            : 'Live values from the FastAPI gateway, refreshed every 2 seconds.'}
-        </p>
-      </div>
-      <div className="ws-metric-grid">
-        {cards.map((c) => (
-          <div className="ws-metric-card" key={c.label}>
-            <div className="ws-metric-card-label">{c.label}</div>
-            <div className="ws-metric-card-val">{c.value}{c.unit && <span className="unit">{c.unit}</span>}</div>
-            <Sparkline seed={c.spark + (summary?.uptime_sec || 0)} w={220} h={48} />
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-};
-
 const SettingsView = () => {
-  const [theme, setTheme] = React.useState('dark');
+  const [theme, setTheme] = React.useState(() => {
+    try { return localStorage.getItem('wsTheme') || 'dark'; } catch { return 'dark'; }
+  });
   const [defaultModel, setDefaultModel] = React.useState(MODELS[1].id);
   const [temp, setTemp] = React.useState(0.7);
   const [ctx, setCtx] = React.useState(8192);
+
+  const applyTheme = (t) => {
+    const resolved = t === 'system'
+      ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+      : t;
+    document.documentElement.setAttribute('data-theme', resolved);
+    try { localStorage.setItem('wsTheme', t); } catch {}
+    setTheme(t);
+  };
+
+  // Apply on mount
+  React.useEffect(() => { applyTheme(theme); }, []);
   return (
     <section className="ws-view">
       <div className="ws-view-head">
@@ -1084,7 +1020,7 @@ const SettingsView = () => {
           </div>
           <div className="ws-segment">
             {['dark', 'light', 'system'].map((v) => (
-              <button key={v} className={theme === v ? 'on' : ''} onClick={() => setTheme(v)}>{v}</button>
+              <button key={v} className={theme === v ? 'on' : ''} onClick={() => applyTheme(v)}>{v}</button>
             ))}
           </div>
         </div>
@@ -1240,6 +1176,8 @@ const ApiKeyRow = () => {
 
 // --- Composer ------------------------------------------------------
 
+const DEFAULT_PARAMS = { temperature: 0.7, maxTokens: 512, streaming: true, useRag: false };
+
 const UserWorkspace = ({ onSignOut, leaving }) => {
   const [model, setModel] = React.useState(MODELS[1]);
   const [active, setActive] = React.useState('chat');
@@ -1247,8 +1185,14 @@ const UserWorkspace = ({ onSignOut, leaving }) => {
   // Lifted: the currently-open conversation. ChatView reads/writes it; the
   // History tab can switch tabs and open a different chat.
   const [chatId, setChatId] = React.useState(null);
+  // Lifted: per-chat params. Persist across tab switches; reset only on new chat.
+  const [params, setParams] = React.useState(DEFAULT_PARAMS);
   const openChat = (id) => { setChatId(id); setActive('chat'); };
-  const newChat = () => { setChatId(null); setActive('chat'); };
+  const newChat = () => {
+    setChatId(null);
+    setActive('chat');
+    setParams(DEFAULT_PARAMS);  // reset settings to defaults on new chat
+  };
 
   return (
     <div className={`workspace user ${leaving ? 'leaving' : ''}`}>
@@ -1257,11 +1201,9 @@ const UserWorkspace = ({ onSignOut, leaving }) => {
         <WsSidebar active={active} setActive={setActive} />
         <main className="ws-main">
           {active === 'chat' && (
-            <ChatView model={model} chatId={chatId} setChatId={setChatId} onNewChat={newChat} />
+            <ChatView model={model} setModel={setModel} chatId={chatId} setChatId={setChatId} onNewChat={newChat} params={params} setParams={setParams} />
           )}
-          {active === 'models' && <ModelsView />}
           {active === 'documents' && <DocumentsView />}
-          {active === 'metrics' && <MetricsView />}
           {active === 'api' && <ApiView />}
           {active === 'history' && <HistoryView openChat={openChat} />}
           {active === 'settings' && <SettingsView />}
@@ -1274,4 +1216,4 @@ const UserWorkspace = ({ onSignOut, leaving }) => {
   );
 };
 
-Object.assign(window, { UserWorkspace, Sparkline, useTicker, MODELS });
+Object.assign(window, { UserWorkspace, MODELS });

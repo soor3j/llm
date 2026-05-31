@@ -1,7 +1,6 @@
 // LLM Inference Server — Admin Workspace
-// Operator dashboard with tabs across the top. Most sections still use
-// generated demo data — Phase 2 wires real endpoints (users registry,
-// queue tracker, log capture).
+// Operator dashboard. Sections poll /admin/* endpoints for live data:
+// users registry, queue tracker, log capture, metrics summary, cache stats.
 
 // Helpers for talking to /admin/* with the admin Bearer token.
 const adminKey = () => {
@@ -18,6 +17,20 @@ const adminFetch = async (path, init = {}) => {
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
+};
+
+// Hook: keep a rolling history of a numeric value across renders.
+// Used by the live charts to show actual time-series rather than fake data.
+const useRollingHistory = (value, max = 60) => {
+  const [history, setHistory] = React.useState([]);
+  React.useEffect(() => {
+    if (value == null) return;
+    setHistory((prev) => {
+      const next = [...prev, Number(value)];
+      return next.length > max ? next.slice(-max) : next;
+    });
+  }, [value, max]);
+  return history;
 };
 
 // Hook: poll an admin endpoint on an interval, return [data, error].
@@ -49,7 +62,6 @@ const ADMIN_SECTIONS = [
   { id: 'cache',    label: 'Cache' },
   { id: 'logs',     label: 'Logs' },
   { id: 'models',   label: 'Models' },
-  { id: 'settings', label: 'Settings' },
 ];
 
 const fmtNum = (n) => n.toLocaleString();
@@ -61,12 +73,7 @@ const AdminTopBar = ({ active, setActive, onSignOut }) => (
     <div className="adm-topbar-left">
       <div className="ws-brand">
         <BrandMark dark size={20} />
-        <span className="ws-brand-name">Inference</span>
-        <span className="ws-divider" />
-        <span className="ws-project">
-          <Icon.Shield size={12} />
-          <span style={{ marginLeft: 6 }}>operator console</span>
-        </span>
+        <span className="ws-brand-name">LLM Inference Server</span>
       </div>
     </div>
     <nav className="adm-tabs">
@@ -81,11 +88,12 @@ const AdminTopBar = ({ active, setActive, onSignOut }) => (
       ))}
     </nav>
     <div className="adm-topbar-right">
-      <div className="ws-health">
-        <span className="ws-dot on" /> Engine healthy
-      </div>
-      <button className="ws-avatar admin" onClick={onSignOut} title="Sign out">
-        <Icon.Shield size={13} />
+      <button
+        onClick={onSignOut}
+        title="Sign out"
+        style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}
+      >
+        <img src="icon3.png" alt="logout" style={{ width: 26, height: 26, objectFit: 'contain', display: 'block' }} />
       </button>
     </div>
   </header>
@@ -95,6 +103,8 @@ const AdminTopBar = ({ active, setActive, onSignOut }) => (
 
 const OverviewSection = () => {
   const [s, err] = useAdminPoll('/admin/metrics/summary', 2000);
+  // Build rolling history from live tps values so the chart shows actual trend.
+  const tpsHistory = useRollingHistory(s?.tokens_per_sec);
   const fmt = (v, suffix = '') => (v == null ? '—' : `${v}${suffix}`);
   const cards = [
     { label: 'Requests / min',  value: fmt(s?.requests_per_min),                                      trend: `${s?.total_requests ?? 0} total`,  spark: 'rpm' },
@@ -122,7 +132,6 @@ const OverviewSection = () => {
               <div className="adm-card-val">{c.value}</div>
               <div className="adm-card-trend">{c.trend}</div>
             </div>
-            <Sparkline seed={c.spark + (s?.uptime_sec || 0)} w={240} h={42} stroke="rgba(242,242,245,0.5)" />
           </div>
         ))}
       </div>
@@ -130,11 +139,11 @@ const OverviewSection = () => {
       <div className="adm-overview-row">
         <div className="adm-panel">
           <div className="adm-panel-head">
-            <h3>Tokens / second · last hour</h3>
+            <h3>Tokens / second · live trend</h3>
             <span className="mono small">{s?.tokens_per_sec ?? '—'} tps</span>
           </div>
           <div className="adm-bigchart">
-            <BigSparkline seed={`tps-${s?.uptime_sec || 0}`} stroke="rgba(242,242,245,0.85)" />
+            <BigSparkline data={tpsHistory} stroke="rgba(242,242,245,0.85)" />
           </div>
         </div>
         <RecentActivityPanel />
@@ -143,8 +152,8 @@ const OverviewSection = () => {
   );
 };
 
-// Replaces the multi-tenant breakdown with a single-node activity feed
-// driven by /admin/queue snapshots — what's actually happening on this box.
+// Live activity feed driven by /admin/queue snapshots — recent completions
+// across the multi-model fleet.
 const RecentActivityPanel = () => {
   const [data, err] = useAdminPoll('/admin/queue', 2500);
   const inflight = data?.inflight || [];
@@ -187,17 +196,23 @@ const RecentActivityPanel = () => {
   );
 };
 
-const BigSparkline = ({ seed, stroke }) => {
+const BigSparkline = ({ seed, stroke, data }) => {
   const points = React.useMemo(() => {
+    // Real data path — normalize to 0..1 based on max value (with floor 1 to avoid /0)
+    if (Array.isArray(data) && data.length > 0) {
+      const max = Math.max(1, ...data);
+      return data.map((v) => v / max);
+    }
+    // Fallback: seeded random (kept for backwards compatibility)
     let s = 1;
-    for (let i = 0; i < seed.length; i++) s = (s + seed.charCodeAt(i) * 31) % 100000;
+    for (let i = 0; i < (seed || '').length; i++) s = (s + seed.charCodeAt(i) * 31) % 100000;
     const out = [];
     for (let i = 0; i < 60; i++) {
       s = (s * 9301 + 49297) % 233280;
       out.push(s / 233280);
     }
     return out;
-  }, [seed]);
+  }, [seed, data]);
   const w = 800; const h = 180;
   const step = w / (points.length - 1);
   const ys = points.map((p) => h - p * (h - 16) - 8);
@@ -291,28 +306,25 @@ const QueueSection = () => {
         <p>
           {err
             ? <span style={{ color: 'oklch(0.78 0.16 25)' }}>Could not reach /admin/queue: {err}</span>
-            : 'Request queue and in-flight tracker for the single-node llama.cpp engine.'}
+            : 'Request queue and in-flight tracker for the multi-model fleet (3 llama.cpp engines).'}
         </p>
       </div>
       <div className="adm-overview-grid three">
         <div className="adm-card">
           <div className="adm-card-label">In flight</div>
           <div className="adm-card-val">{inFlight}</div>
-          <Sparkline seed={`if-${data?.completed_total || 0}`} w={220} h={36} />
         </div>
         <div className="adm-card">
           <div className="adm-card-label">Completed (recent)</div>
           <div className="adm-card-val">{recent.length}<small style={{ color: 'rgba(242,242,245,0.4)' }}> / 100</small></div>
-          <Sparkline seed={`rc-${recent.length}`} w={220} h={36} />
         </div>
         <div className="adm-card">
           <div className="adm-card-label">Latency · p95</div>
           <div className="adm-card-val">{p95 ?? '—'}<span className="unit">{p95 != null ? 'ms' : ''}</span></div>
-          <Sparkline seed={`p95-${p95 || 0}`} w={220} h={36} />
         </div>
       </div>
       <div className="adm-panel" style={{ marginTop: 16 }}>
-        <div className="adm-panel-head"><h3>Engine</h3><span className="mono small">single-node</span></div>
+        <div className="adm-panel-head"><h3>Engines</h3><span className="mono small">multi-model fleet</span></div>
         <div className="ws-table no-border">
           <div className="ws-tr head adm-q-row">
             <span>Worker</span>
@@ -321,18 +333,24 @@ const QueueSection = () => {
             <span>In flight</span>
             <span>Recent p50</span>
           </div>
-          <div className="ws-tr adm-q-row">
-            <span className="mono">llama-cpp-01</span>
-            <span className="mono">mistral-7b</span>
-            <span>
-              <span className={`adm-state ${engineState}`}>
-                <span className={`ws-dot ${engineState === 'busy' ? 'on' : engineState === 'idle' ? 'idle' : 'off'}`} />
-                {engineState}
+          {[
+            { worker: 'llama-cpp', model: 'mistral-7b' },
+            { worker: 'llama-cpp-phi', model: 'phi-3.5-mini' },
+            { worker: 'llama-cpp-llama', model: 'llama-3.2-3b' },
+          ].map((w) => (
+            <div className="ws-tr adm-q-row" key={w.worker}>
+              <span className="mono">{w.worker}</span>
+              <span className="mono">{w.model}</span>
+              <span>
+                <span className={`adm-state ${engineState}`}>
+                  <span className={`ws-dot ${engineState === 'busy' ? 'on' : engineState === 'idle' ? 'idle' : 'off'}`} />
+                  {engineState}
+                </span>
               </span>
-            </span>
-            <span className="mono">{inFlight}</span>
-            <span className="mono">{p50 != null ? `${p50}ms` : '—'}</span>
-          </div>
+              <span className="mono">{inFlight}</span>
+              <span className="mono">{p50 != null ? `${p50}ms` : '—'}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -383,24 +401,20 @@ const CacheSection = () => {
         <div className="adm-card">
           <div className="adm-card-label">Entries</div>
           <div className="adm-card-val">{data?.entries ?? '—'}</div>
-          <Sparkline seed={`ce-${data?.entries || 0}`} w={240} h={36} />
         </div>
         <div className="adm-card">
           <div className="adm-card-label">Hit rate</div>
           <div className="adm-card-val">{hitRatePct}{data ? <span className="unit">%</span> : null}</div>
-          <Sparkline seed={`ch-${data?.hits || 0}`} w={240} h={36} />
         </div>
         <div className="adm-card">
           <div className="adm-card-label">Hits / Misses</div>
           <div className="adm-card-val" style={{ fontSize: 24 }}>
             {data?.hits ?? '—'}<small style={{ color: 'rgba(242,242,245,0.4)' }}> / {data?.misses ?? '—'}</small>
           </div>
-          <Sparkline seed={`hm-${data?.misses || 0}`} w={240} h={36} />
         </div>
         <div className="adm-card">
           <div className="adm-card-label">Redis memory</div>
           <div className="adm-card-val" dangerouslySetInnerHTML={{ __html: fmtBytes(data?.memory_bytes) }} />
-          <Sparkline seed={`cm-${data?.memory_bytes || 0}`} w={240} h={36} />
         </div>
       </div>
       <div className="adm-cache-actions">
@@ -484,6 +498,8 @@ const LogsSection = () => {
 
 const AdminMetricsSection = () => {
   const [s, err] = useAdminPoll('/admin/metrics/summary', 2000);
+  const ttftHistory = useRollingHistory(s?.ttft_mean_ms);
+  const tpsHistory = useRollingHistory(s?.tokens_per_sec);
   return (
     <div className="adm-section">
       <div className="ws-view-head">
@@ -498,42 +514,36 @@ const AdminMetricsSection = () => {
         <div className="adm-card">
           <div className="adm-card-label">TTFT (mean)</div>
           <div className="adm-card-val">{s?.ttft_mean_ms ?? '—'}<span className="unit">ms</span></div>
-          <Sparkline seed={`ttft-${s?.uptime_sec || 0}`} w={240} h={36} />
         </div>
         <div className="adm-card">
           <div className="adm-card-label">Tokens / second</div>
           <div className="adm-card-val">{s?.tokens_per_sec ?? '—'}</div>
-          <Sparkline seed={`tps-${s?.tokens_total || 0}`} w={240} h={36} />
         </div>
         <div className="adm-card">
           <div className="adm-card-label">Total tokens</div>
           <div className="adm-card-val">{s?.tokens_total ?? '—'}</div>
-          <Sparkline seed={`tok-${s?.tokens_total || 0}`} w={240} h={36} />
         </div>
         <div className="adm-card">
           <div className="adm-card-label">Cache hit rate</div>
           <div className="adm-card-val">{s ? Math.round((s.cache_hit_rate ?? 0) * 100) : '—'}<span className="unit">%</span></div>
-          <Sparkline seed={`ch-${s?.cache_hits || 0}`} w={240} h={36} />
         </div>
         <div className="adm-card">
           <div className="adm-card-label">Error rate</div>
           <div className="adm-card-val">{s ? (s.error_rate * 100).toFixed(2) : '—'}<span className="unit">%</span></div>
-          <Sparkline seed={`er-${s?.errors || 0}`} w={240} h={36} />
         </div>
         <div className="adm-card">
           <div className="adm-card-label">Process memory</div>
           <div className="adm-card-val">{s?.memory_mb ?? '—'}<span className="unit">MB</span></div>
-          <Sparkline seed={`mem-${s?.memory_mb || 0}`} w={240} h={36} />
         </div>
       </div>
       <div className="adm-overview-row" style={{ marginTop: 16 }}>
         <div className="adm-panel">
           <div className="adm-panel-head"><h3>Latency trend</h3><span className="mono small">{s?.ttft_mean_ms ?? '—'}ms mean</span></div>
-          <div className="adm-bigchart"><BigSparkline seed={`lat-${s?.uptime_sec || 0}`} stroke="rgba(242,242,245,0.85)" /></div>
+          <div className="adm-bigchart"><BigSparkline data={ttftHistory} stroke="rgba(242,242,245,0.85)" /></div>
         </div>
         <div className="adm-panel">
           <div className="adm-panel-head"><h3>Throughput trend</h3><span className="mono small">{s?.tokens_per_sec ?? '—'} tps</span></div>
-          <div className="adm-bigchart"><BigSparkline seed={`tps-${s?.tokens_total || 0}`} stroke="oklch(0.72 0.16 248)" /></div>
+          <div className="adm-bigchart"><BigSparkline data={tpsHistory} stroke="oklch(0.72 0.16 248)" /></div>
         </div>
       </div>
     </div>

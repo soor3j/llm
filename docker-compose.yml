@@ -11,6 +11,12 @@ services:
     container_name: llm-gateway
     ports:
       - "8000:8000"
+    volumes:
+      # Live-mount static frontend files — edits on host appear instantly
+      # in the container (just hard-refresh the browser). No rebuild needed.
+      - ./gateway/static:/app/gateway/static
+      - ./gateway/services:/app/gateway/services
+      - ./gateway/routers:/app/gateway/routers
     environment:
       API_KEY: ${API_KEY}
       ADMIN_API_KEY: ${ADMIN_API_KEY:-}
@@ -19,6 +25,13 @@ services:
       INFERENCE_BACKEND: llamacpp
       MODEL_NAME: ${MODEL_NAME:-mistral-7b}
       MODEL_PATH: /models/${MODEL_FILE:-mistral-7b-instruct-v0.2.Q4_K_M.gguf}
+      # Multi-model fleet — each model runs in its own llama.cpp container
+      ENGINE_MISTRAL_HOST: llama-cpp
+      ENGINE_MISTRAL_PORT: 8001
+      ENGINE_PHI_HOST: llama-cpp-phi
+      ENGINE_PHI_PORT: 8001
+      ENGINE_LLAMA_HOST: llama-cpp-llama
+      ENGINE_LLAMA_PORT: 8001
       CHAT_TEMPLATE: ${CHAT_TEMPLATE:-auto}
       CONTEXT_LENGTH: ${CONTEXT_LENGTH:-4096}
       MAX_TOKENS_DEFAULT: ${MAX_TOKENS_DEFAULT:-512}
@@ -32,6 +45,10 @@ services:
       ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
     depends_on:
       llama-cpp:
+        condition: service_healthy
+      llama-cpp-phi:
+        condition: service_healthy
+      llama-cpp-llama:
         condition: service_healthy
       redis:
         condition: service_started
@@ -73,6 +90,66 @@ services:
       interval: 10s
       timeout: 5s
       retries: 30         # Allow up to 5 minutes for model load
+      start_period: 30s
+
+  # ----------------------------------------------------------------
+  # llama.cpp — Phi-3.5 Mini engine
+  # ----------------------------------------------------------------
+  llama-cpp-phi:
+    image: llm-llamacpp-engine:latest
+    container_name: llm-engine-phi
+    expose:
+      - "8001"
+    volumes:
+      - "${MODEL_PATH}:/models:ro"
+    environment:
+      MODEL_FILE: /models/Phi-3.5-mini-instruct-Q4_K_M.gguf
+      CTX_SIZE: ${CONTEXT_LENGTH:-4096}
+      THREADS: ${THREADS:-4}
+      N_GPU_LAYERS: ${N_GPU_LAYERS:-0}
+      HOST: 0.0.0.0
+      PORT: 8001
+    networks:
+      - inference-net
+    restart: unless-stopped
+    depends_on:
+      llama-cpp:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # ----------------------------------------------------------------
+  # llama.cpp — Llama 3.2 3B engine
+  # ----------------------------------------------------------------
+  llama-cpp-llama:
+    image: llm-llamacpp-engine:latest
+    container_name: llm-engine-llama
+    expose:
+      - "8001"
+    volumes:
+      - "${MODEL_PATH}:/models:ro"
+    environment:
+      MODEL_FILE: /models/Llama-3.2-3B-Instruct-Q4_K_M.gguf
+      CTX_SIZE: ${CONTEXT_LENGTH:-4096}
+      THREADS: ${THREADS:-4}
+      N_GPU_LAYERS: ${N_GPU_LAYERS:-0}
+      HOST: 0.0.0.0
+      PORT: 8001
+    networks:
+      - inference-net
+    restart: unless-stopped
+    depends_on:
+      llama-cpp:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
       start_period: 30s
 
   # ----------------------------------------------------------------

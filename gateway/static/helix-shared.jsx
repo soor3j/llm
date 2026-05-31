@@ -1,14 +1,7 @@
 // LLM Inference Server — shared components & icons
 
-const BrandMark = ({ size = 22, dark = false }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <path
-      d="M6 4 L6 20 M18 4 L18 20 M6 8 C 10 8, 14 16, 18 16 M6 16 C 10 16, 14 8, 18 8"
-      stroke={dark ? '#F2F2F5' : '#0A0A0B'}
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    />
-  </svg>
+const BrandMark = ({ size = 56, dark = false }) => (
+  <img src="icon2.png" width={size} height={size} style={{ objectFit: 'contain', display: 'block', transform: 'scale(1.8)', transformOrigin: 'center' }} alt="logo" />
 );
 
 const Icon = {
@@ -22,14 +15,7 @@ const Icon = {
       <path d="M3 5l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
-  Shield: ({ size = 18 }) => (
-    <svg width={size} height={size} viewBox="0 0 18 18" fill="none">
-      <path d="M9 1.5 L2.5 4 V9.2 C 2.5 12.6, 5.4 15.3, 9 16.5 C 12.6 15.3, 15.5 12.6, 15.5 9.2 V4 Z"
-        stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-      <path d="M6.5 9 L8.2 10.7 L11.6 7.3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  ),
-  User: ({ size = 18 }) => (
+User: ({ size = 18 }) => (
     <svg width={size} height={size} viewBox="0 0 18 18" fill="none">
       <circle cx="9" cy="6.5" r="3" stroke="currentColor" strokeWidth="1.4" />
       <path d="M2.5 15.5 C 3.5 12.5, 6 11, 9 11 C 12 11, 14.5 12.5, 15.5 15.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
@@ -110,23 +96,4 @@ function useReveal(opts = {}) {
   return [ref, shown];
 }
 
-// Hook: count-up
-function useCountUp(target, { duration = 1800, decimals = 0, start = false } = {}) {
-  const [val, setVal] = React.useState(0);
-  React.useEffect(() => {
-    if (!start) return;
-    let raf;
-    const t0 = performance.now();
-    const tick = (t) => {
-      const p = Math.min(1, (t - t0) / duration);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setVal(target * eased);
-      if (p < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [start, target, duration]);
-  return decimals > 0 ? val.toFixed(decimals) : Math.round(val).toLocaleString();
-}
-
-Object.assign(window, { BrandMark, Icon, useReveal, useCountUp });
+Object.assign(window, { BrandMark, Icon, useReveal });
