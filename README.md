@@ -18,20 +18,26 @@ No cloud API costs. No data leaving your machine. Full observability included.
 
 ## Screenshots
 
-### Landing & Auth
-| Home | Architecture | Sign In (User) | Sign In (Admin) |
-|------|-------------|----------------|-----------------|
-| ![Home](docs/screenshots/Home.png) | ![Architecture](docs/screenshots/Architecture.png) | ![User Login](docs/screenshots/UserAcc.png) | ![Admin Login](docs/screenshots/AdminAcc.png) |
+### Homepage
+![Home](docs/screenshots/Home.png)
+![Architecture](docs/screenshots/Architecture.png)
 
-### User Workspace
-| New Chat | Chat in Action | Document Upload | API Reference | Chat History | Settings |
-|----------|---------------|-----------------|---------------|--------------|----------|
-| ![New Chat](docs/screenshots/ChatDefault.png) | ![Chat](docs/screenshots/ChatQn.png) | ![Documents](docs/screenshots/DocUpload.png) | ![API](docs/screenshots/API.png) | ![History](docs/screenshots/ChatHistoy.png) | ![Settings](docs/screenshots/Setting.png) |
+### User
+![User Login](docs/screenshots/UserAcc.png)
+![New Chat](docs/screenshots/ChatDefault.png)
+![Chat in Action](docs/screenshots/ChatQn.png)
+![Document Upload](docs/screenshots/DocUpload.png)
+![API Reference](docs/screenshots/API.png)
+![Chat History](docs/screenshots/ChatHistoy.png)
+![Settings](docs/screenshots/Setting.png)
 
-### Admin Console
-| Overview | Metrics | Queue | Cache | Models |
-|----------|---------|-------|-------|--------|
-| ![Overview](docs/screenshots/AdminOverview.png) | ![Metrics](docs/screenshots/AdminMetrics.png) | ![Queue](docs/screenshots/AdminQueue.png) | ![Cache](docs/screenshots/AdminCache.png) | ![Models](docs/screenshots/AdminModels.png) |
+### Admin
+![Admin Login](docs/screenshots/AdminAcc.png)
+![Overview](docs/screenshots/AdminOverview.png)
+![Metrics](docs/screenshots/AdminMetrics.png)
+![Queue](docs/screenshots/AdminQueue.png)
+![Cache](docs/screenshots/AdminCache.png)
+![Models](docs/screenshots/AdminModels.png)
 
 ---
 
