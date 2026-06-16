@@ -7,7 +7,7 @@
 
 ---
 
-**Run your own AI — privately, securely, for free.**  
+**Run your own AI: privately, securely, for free.**  
 No cloud API costs. No data leaving your machine. Full observability included.
 
 [What Is This?](#what-is-this-non-technical-explanation) • [Architecture](#architecture) • [Quickstart](#quickstart-5-minutes) • [API Reference](#api-reference) • [How It Works](#how-every-component-works) • [Configuration](#configuration) • [Testing](#testing) • [Observability](#observability) • [Design Decisions](#architecture-decision-records) • [Roadmap](#roadmap) • [FAQ](#faq) • [Glossary](#glossary)
@@ -47,16 +47,16 @@ No cloud API costs. No data leaving your machine. Full observability included.
 
 ### The Problem This Solves
 
-When you use ChatGPT, Claude, or Gemini, every message you type is sent to a remote company's server. For most use cases that's fine — but not for everyone:
+When you use ChatGPT, Claude, or Gemini, every message you type is sent to a remote company's server. For most use cases that's fine, but not for everyone:
 
-- A **hospital** asking an AI to help draft patient notes cannot send those notes to OpenAI — HIPAA prohibits it.
+- A **hospital** asking an AI to help draft patient notes cannot send those notes to OpenAI; HIPAA prohibits it.
 - A **law firm** reviewing contracts cannot send privileged client communications to a third-party cloud service.
 - A **startup** building an AI product and paying $0.02 per 1,000 tokens will spend thousands of dollars per month at scale.
 - A **researcher** who needs reproducible, offline results cannot rely on a cloud service that can change without notice.
 
 ### The Solution
 
-This project lets you run a powerful AI model **entirely on your own computer or server**. Your prompts never leave your machine. It speaks the exact same language as ChatGPT's API — so any code or tool already built for OpenAI works here without modification, just by changing one URL.
+This project lets you run a powerful AI model **entirely on your own computer or server**. Your prompts never leave your machine. It speaks the exact same language as ChatGPT's API, so any code or tool already built for OpenAI works here without modification, just by changing one URL.
 
 ```
 BEFORE:  client = OpenAI(base_url="https://api.openai.com/v1",  api_key="sk-...")
@@ -81,9 +81,9 @@ This isn't a toy demo. It includes the same infrastructure patterns used in real
 
 ### What Model Does It Run?
 
-By default it runs **Mistral 7B Instruct** — a 7-billion-parameter open-source language model that:
+By default it runs **Mistral 7B Instruct**, a 7-billion-parameter open-source language model that:
 - Fits in **8 GB of RAM** (using INT4 quantization, the model is compressed from 14 GB to ~4.1 GB)
-- Runs on a **regular CPU** — no GPU required
+- Runs on a **regular CPU** - no GPU required
 - Produces answers of similar quality to GPT-3.5 for most tasks
 - Is completely **free to use commercially**
 
@@ -129,7 +129,7 @@ By default it runs **Mistral 7B Instruct** — a 7-billion-parameter open-source
 │                  ▼                                              │
 │   ┌──────────────────────────────────┐                         │
 │   │   llama.cpp Engine  :8001        │                         │
-│   │   (internal only — no host port) │                         │
+│   │   (internal only, no host port) │                         │
 │   │                                  │                         │
 │   │   Mistral 7B INT4 model          │                         │
 │   │   ~/models/ ──── read-only mount │                         │
@@ -223,11 +223,11 @@ grafana
 | RAM | 8 GB | 16 GB |
 | Disk space | 6 GB | 10 GB |
 | Docker Desktop | Any | Latest |
-| OS | Windows 10 / macOS 12 / Ubuntu 20.04 | — |
+| OS | Windows 10 / macOS 12 / Ubuntu 20.04 | - |
 
 > **No GPU required.** The server runs entirely on CPU.
 
-### Step 1 — Download the Model (~4.1 GB)
+### Step 1: Download the Model (~4.1 GB)
 
 <details>
 <summary><b>Linux / macOS</b></summary>
@@ -256,7 +256,7 @@ Invoke-WebRequest `
 ```
 </details>
 
-### Step 2 — Configure Environment
+### Step 2: Configure Environment
 
 ```bash
 cp .env.example .env
@@ -278,7 +278,7 @@ MODEL_PATH=/home/yourname/models
 MODEL_PATH=C:\Users\yourname\models
 ```
 
-### Step 3 — Start the Stack
+### Step 3: Start the Stack
 
 ```bash
 docker compose up --build
@@ -298,7 +298,7 @@ docker compose logs -f gateway
 # Look for: {"event": "server_ready", "port": 8000}
 ```
 
-### Step 4 — Verify It's Working
+### Step 4: Verify It's Working
 
 ```bash
 # Health check (no auth required)
@@ -308,7 +308,7 @@ curl http://localhost:8000/health
 # {"status":"ok","engine":"llamacpp","model_loaded":true}
 ```
 
-### Step 5 — Make Your First AI Request
+### Step 5: Make Your First AI Request
 
 <details>
 <summary><b>Using curl</b></summary>
@@ -383,7 +383,7 @@ console.log(response.choices[0].message.content);
 ```
 </details>
 
-### Step 6 — Open the Observability Dashboard
+### Step 6: Open the Observability Dashboard
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
@@ -494,7 +494,7 @@ async def lifespan(app: FastAPI):
         app.state.cache = await SemanticCache.create(r, settings)
         # ↑ This downloads and loads the 22MB all-MiniLM-L6-v2 model
     except Exception:
-        log.warning("redis_unavailable")         # Redis is optional — server keeps running
+        log.warning("redis_unavailable")         # Redis is optional - server keeps running
 
     yield  # ← server is now serving requests
 
@@ -502,13 +502,13 @@ async def lifespan(app: FastAPI):
     await app.state.redis_client.aclose()        # Clean connection teardown
 ```
 
-**Key design: graceful degradation.** If Redis is unavailable, the server starts anyway — caching and rate limiting are simply disabled. The LLM inference still works. This means a Redis outage doesn't take down the entire service.
+**Key design: graceful degradation.** If Redis is unavailable, the server starts anyway; caching and rate limiting are simply disabled. The LLM inference still works. This means a Redis outage doesn't take down the entire service.
 
 The application then mounts three routes:
-- `/health` — no auth
-- `/v1/chat/completions` — auth + rate limit required
-- `/v1/models` — auth required
-- `/metrics` — no auth (Prometheus scraping endpoint)
+- `/health`: no auth
+- `/v1/chat/completions`: auth + rate limit required
+- `/v1/models`: auth required
+- `/metrics`: no auth (Prometheus scraping endpoint)
 
 #### 1b. Configuration (`config.py`)
 
@@ -516,7 +516,7 @@ All configuration is loaded from environment variables using [pydantic-settings]
 
 ```python
 class Settings(BaseSettings):
-    api_key: str                           # Required — server won't start without it
+    api_key: str                           # Required - server won't start without it
     admin_api_key: str = ""                # Optional separate key for admin endpoints
 
     engine_host: str = "localhost"         # llama.cpp hostname
@@ -559,7 +559,7 @@ class ChatCompletionResponse(BaseModel):
 
 #### 1d. Chat Completions Router (`routers/chat.py`)
 
-This is the main endpoint — every inference request goes through here.
+This is the main endpoint; every inference request goes through here.
 
 ```
 POST /v1/chat/completions
@@ -582,7 +582,7 @@ POST /v1/chat/completions
               └── yield: "data: [DONE]\n\n"
 ```
 
-The streaming path uses Python async generators — tokens are yielded to the client as they arrive from the engine, character by character, with no buffering. This is what creates the "typing" effect seen in ChatGPT.
+The streaming path uses Python async generators; tokens are yielded to the client as they arrive from the engine, character by character, with no buffering. This is what creates the "typing" effect seen in ChatGPT.
 
 **Metrics are recorded in a `finally` block** so they always update even if the request fails mid-stream.
 
@@ -602,7 +602,7 @@ def verify_api_key(credentials, settings) -> str:
     return credentials.credentials  # Returns key for downstream logging
 ```
 
-**Why `secrets.compare_digest()`?** A regular string comparison (`a == b`) short-circuits — it returns `False` as soon as it finds the first mismatching character. This means an attacker can measure response times to determine how many characters of their guess are correct. `compare_digest` always takes the same amount of time regardless of where the strings differ, making this attack impossible.
+**Why `secrets.compare_digest()`?** A regular string comparison (`a == b`) short-circuits: it returns `False` as soon as it finds the first mismatching character. This means an attacker can measure response times to determine how many characters of their guess are correct. `compare_digest` always takes the same amount of time regardless of where the strings differ, making this attack impossible.
 
 #### 1f. Rate Limiter (`middleware/rate_limit.py`)
 
@@ -624,7 +624,7 @@ Algorithm:
   If count (before add) >= RATE_LIMIT_RPM → return 429 with Retry-After header
 ```
 
-This approach is more accurate than a fixed window because there's no "burst at window boundary" problem — it truly limits to N requests in any 60-second window.
+This approach is more accurate than a fixed window because there's no "burst at window boundary" problem; it truly limits to N requests in any 60-second window.
 
 #### 1g. Inference Engine Client (`services/engine.py`)
 
@@ -662,7 +662,7 @@ async with client.stream("POST", ".../completion", json=payload) as response:
 
 #### 1h. Semantic Cache (`services/cache.py`)
 
-This is one of the most sophisticated components. Instead of exact string matching, it uses **semantic similarity** — two questions that mean the same thing return the same cached answer.
+This is one of the most sophisticated components. Instead of exact string matching, it uses **semantic similarity**: two questions that mean the same thing return the same cached answer.
 
 ```
 How it works:
@@ -685,7 +685,7 @@ Eviction:
   If index length > 1000 entries → remove the oldest entry (FIFO)
 ```
 
-**The embedding model** (`all-MiniLM-L6-v2`) is a 22 MB neural network that converts text into a 384-dimensional vector where similar meanings are geometrically close together. It runs on CPU in ~80ms — negligible compared to AI inference which takes seconds.
+**The embedding model** (`all-MiniLM-L6-v2`) is a 22 MB neural network that converts text into a 384-dimensional vector where similar meanings are geometrically close together. It runs on CPU in ~80ms, negligible compared to AI inference which takes seconds.
 
 ---
 
@@ -709,7 +709,7 @@ CMD llama-server -m $MODEL_FILE --port $PORT --ctx-size $CTX_SIZE --threads $THR
 ```
 
 The resulting container:
-- Listens on `:8001` (internal Docker network only — never exposed to the host)
+- Listens on `:8001` (internal Docker network only, never exposed to the host)
 - Accepts OpenAI-style `/completion` requests
 - Supports both full and streaming responses via SSE
 - Responds to `/health` for Docker health checks
@@ -751,9 +751,9 @@ Five services are defined in `docker-compose.yml`:
 Host machine ports exposed:
   :8000 → gateway     (public API)
   :3000 → grafana     (dashboards)
-  :9090 → prometheus  (metrics UI — optional, typically internal)
+  :9090 → prometheus  (metrics UI, optional, typically internal)
 
-Internal Docker network (inference-net) — NOT reachable from outside:
+Internal Docker network (inference-net): NOT reachable from outside:
   :8001 → llama-cpp   (inference engine)
   :6379 → redis       (cache + rate limit)
 
@@ -771,7 +771,7 @@ Health checks:
 ```
 </details>
 
-**Security note:** Only ports 8000 and 3000 are published to the host. The inference engine and Redis are completely isolated on the internal Docker network — they cannot be accessed from outside the container environment.
+**Security note:** Only ports 8000 and 3000 are published to the host. The inference engine and Redis are completely isolated on the internal Docker network; they cannot be accessed from outside the container environment.
 
 ---
 
@@ -1052,7 +1052,7 @@ tests/test_chat.py::test_models_endpoint_returns_model_list              PASSED
 
 ### How the Tests Work
 
-Tests use FastAPI's `ASGITransport` to call the full application stack in-process — no actual network calls, no Docker required. The app state is seeded manually in `conftest.py` because the lifespan context doesn't run in test mode:
+Tests use FastAPI's `ASGITransport` to call the full application stack in-process, no actual network calls, no Docker required. The app state is seeded manually in `conftest.py` because the lifespan context doesn't run in test mode:
 
 ```python
 @pytest.fixture
@@ -1193,7 +1193,7 @@ uv pip install -e ".[dev]"
 # 3. Start Redis separately (Docker is easiest)
 docker run -d -p 6379:6379 redis:7-alpine
 
-# 4. Start llama.cpp server (must be compiled — see llama-cpp-server/Dockerfile)
+# 4. Start llama.cpp server (must be compiled; see llama-cpp-server/Dockerfile)
 ./llama.cpp/build/bin/llama-server \
   -m ~/models/mistral-7b-instruct-v0.2.Q4_K_M.gguf \
   --port 8001 -c 4096 -t 8
@@ -1243,7 +1243,7 @@ To use a different GGUF model:
    ```
 3. Restart the stack: `docker compose restart llama-cpp gateway`
 
-**Chat templates are auto-detected** from `MODEL_FILE` / `MODEL_NAME` — no code changes needed when switching models. Supported families: `mistral`, `llama3`, `qwen2`, `chatml`, `phi3`, `gemma`. Override auto-detection with `CHAT_TEMPLATE=<family>` in `.env` if needed.
+**Chat templates are auto-detected** from `MODEL_FILE` / `MODEL_NAME` - no code changes needed when switching models. Supported families: `mistral`, `llama3`, `qwen2`, `chatml`, `phi3`, `gemma`. Override auto-detection with `CHAT_TEMPLATE=<family>` in `.env` if needed.
 
 ---
 
@@ -1281,7 +1281,7 @@ All significant design choices are documented in `docs/adr/`. Here is a summary:
 | Request validation | Pydantic v2 built-in | Manual or third-party |
 | OpenAPI docs | Auto-generated at `/docs` | Manual |
 
-**Why:** Server-Sent Events streaming is a first-class requirement — the AI model generates tokens one at a time and they must reach the client immediately. Flask's synchronous model would require a thread per connection, which doesn't scale. FastAPI's async generators yield tokens directly to the HTTP response with zero buffering.
+**Why:** Server-Sent Events streaming is a first-class requirement: the AI model generates tokens one at a time and they must reach the client immediately. Flask's synchronous model would require a thread per connection, which doesn't scale. FastAPI's async generators yield tokens directly to the HTTP response with zero buffering.
 
 📄 [Full ADR](docs/adr/ADR-002-fastapi-over-flask.md)
 
@@ -1297,9 +1297,9 @@ All significant design choices are documented in `docs/adr/`. Here is a summary:
 - `"Tell me the capital city of France"`
 - `"France capital?"`
 
-Exact string matching treats all of these as different. Semantic caching recognizes they are the same question and serves a single cached answer — estimated **15–25% higher effective hit rate** than exact matching on real workloads.
+Exact string matching treats all of these as different. Semantic caching recognizes they are the same question and serves a single cached answer, estimated **15–25% higher effective hit rate** than exact matching on real workloads.
 
-**The Risk:** A false positive (similarity ≥ 0.95 but actually different meaning) would return a wrong answer. The 0.95 threshold is conservative — paraphrases typically score 0.97–0.99, while unrelated prompts score below 0.80.
+**The Risk:** A false positive (similarity ≥ 0.95 but actually different meaning) would return a wrong answer. The 0.95 threshold is conservative; paraphrases typically score 0.97–0.99, while unrelated prompts score below 0.80.
 
 📄 [Full ADR](docs/adr/ADR-003-semantic-cache-design.md)
 
@@ -1319,7 +1319,7 @@ Exact string matching treats all of these as different. Semantic caching recogni
 | Model format | GGUF (quantized) | SafeTensors (full precision or GPTQ) |
 | Upgrade path | Change one env var | Change one env var |
 
-**Why:** The MVP target is demoing on a developer laptop without specialized hardware. The adapter pattern means upgrading to vLLM in Phase 2 only requires changing `INFERENCE_BACKEND=vllm` in `.env` — no gateway code changes needed.
+**Why:** The MVP target is demoing on a developer laptop without specialized hardware. The adapter pattern means upgrading to vLLM in Phase 2 only requires changing `INFERENCE_BACKEND=vllm` in `.env`, no gateway code changes needed.
 
 📄 [Full ADR](docs/adr/ADR-004-llama-cpp-for-mvp.md)
 
@@ -1329,20 +1329,20 @@ Exact string matching treats all of these as different. Semantic caching recogni
 
 ### Phase 2 (GPU Support + Scalability)
 
-- [ ] **vLLM GPU backend** — set `INFERENCE_BACKEND=vllm` + `ENGINE_HOST=vllm-container`, no gateway code changes needed (adapter pattern)
-- [ ] **`asyncio.Queue` request queue** — configurable depth, backpressure handling, `queue_depth` Prometheus metric (already defined in `metrics.py`)
-- [ ] **Multi-model hot-swap** — serve multiple models, route by `model` field in request
-- [ ] **HuggingFace Hub auto-download** — zero-config model acquisition with resume support (eliminates manual step 1 from quickstart)
-- [ ] **Grafana alerts** — webhook notification when p99 TTFT > 3s
+- [ ] **vLLM GPU backend**: set `INFERENCE_BACKEND=vllm` + `ENGINE_HOST=vllm-container`, no gateway code changes needed (adapter pattern)
+- [ ] **`asyncio.Queue` request queue**: configurable depth, backpressure handling, `queue_depth` Prometheus metric (already defined in `metrics.py`)
+- [ ] **Multi-model hot-swap**: serve multiple models, route by `model` field in request
+- [ ] **HuggingFace Hub auto-download**: zero-config model acquisition with resume support (eliminates manual step 1 from quickstart)
+- [ ] **Grafana alerts**: webhook notification when p99 TTFT > 3s
 
 ### Phase 3 (Advanced Features)
 
-- [ ] **LoRA adapter loading** — fine-tuned model adapters without full model reloads
-- [ ] **Multi-key API key management** — per-user keys with individual rate limits
-- [ ] **Request priority queue** — premium users skip the queue
-- [ ] **Structured output (JSON mode)** — guaranteed JSON schema-conformant responses
-- [ ] **Function calling** — OpenAI-compatible tool/function calling support
-- [ ] **Embeddings endpoint** — `POST /v1/embeddings` using the same sentence-transformer model
+- [ ] **LoRA adapter loading**: fine-tuned model adapters without full model reloads
+- [ ] **Multi-key API key management**: per-user keys with individual rate limits
+- [ ] **Request priority queue**: premium users skip the queue
+- [ ] **Structured output (JSON mode)**: guaranteed JSON schema-conformant responses
+- [ ] **Function calling**: OpenAI-compatible tool/function calling support
+- [ ] **Embeddings endpoint**: `POST /v1/embeddings` using the same sentence-transformer model
 
 ---
 
@@ -1351,15 +1351,15 @@ Exact string matching treats all of these as different. Semantic caching recogni
 <details>
 <summary><b>Can I use models other than Mistral 7B?</b></summary>
 
-Yes — any GGUF-format model that llama.cpp supports. Popular alternatives:
-- `Llama-3.2-3B-Instruct.Q4_K_M.gguf` — faster, less accurate, only 2 GB RAM
-- `Llama-3.1-8B-Instruct.Q4_K_M.gguf` — similar quality to Mistral, 5 GB RAM
-- `Phi-3.5-mini-instruct.Q4_K_M.gguf` — Microsoft's compact model, 2.5 GB RAM
-- `Qwen2.5-7B-Instruct-Q4_K_M.gguf` — strong alternative, 4.7 GB RAM
+Yes, any GGUF-format model that llama.cpp supports. Popular alternatives:
+- `Llama-3.2-3B-Instruct.Q4_K_M.gguf` - faster, less accurate, only 2 GB RAM
+- `Llama-3.1-8B-Instruct.Q4_K_M.gguf` - similar quality to Mistral, 5 GB RAM
+- `Phi-3.5-mini-instruct.Q4_K_M.gguf` - Microsoft's compact model, 2.5 GB RAM
+- `Qwen2.5-7B-Instruct-Q4_K_M.gguf` - strong alternative, 4.7 GB RAM
 
 Download from [HuggingFace TheBloke](https://huggingface.co/TheBloke) or [Bartowski's collection](https://huggingface.co/bartowski). After downloading, update `MODEL_FILE` and `MODEL_NAME` in `.env`.
 
-**Chat templates are auto-detected** from the model filename — no code changes needed. Set `CHAT_TEMPLATE=auto` (the default) and the gateway automatically picks the right prompt format for mistral, llama3, qwen2, phi3, or gemma models. You can also set it explicitly: `CHAT_TEMPLATE=llama3`.
+**Chat templates are auto-detected** from the model filename; no code changes needed. Set `CHAT_TEMPLATE=auto` (the default) and the gateway automatically picks the right prompt format for mistral, llama3, qwen2, phi3, or gemma models. You can also set it explicitly: `CHAT_TEMPLATE=llama3`.
 </details>
 
 <details>
@@ -1378,9 +1378,9 @@ vLLM support (for maximum GPU performance) is planned for Phase 2 and will not r
 <summary><b>Why is the first request slow?</b></summary>
 
 Three reasons:
-1. **Model loading** — llama.cpp reads the 4.1 GB model from disk into RAM on first startup (~30 seconds). Subsequent requests don't reload the model.
-2. **Cold sentence-transformer** — the first cache lookup computes an embedding (80ms) and finds no cached entries. Subsequent similar requests get cache hits.
-3. **CPU warmup** — the first inference call is sometimes slower due to CPU cache warmup.
+1. **Model loading**: llama.cpp reads the 4.1 GB model from disk into RAM on first startup (~30 seconds). Subsequent requests don't reload the model.
+2. **Cold sentence-transformer**: the first cache lookup computes an embedding (80ms) and finds no cached entries. Subsequent similar requests get cache hits.
+3. **CPU warmup**: the first inference call is sometimes slower due to CPU cache warmup.
 
 After warmup, expect consistent latency.
 </details>
@@ -1389,9 +1389,9 @@ After warmup, expect consistent latency.
 <summary><b>What happens if Redis goes down?</b></summary>
 
 The gateway handles Redis unavailability gracefully:
-- **Caching is disabled** — all requests go directly to the inference engine
-- **Rate limiting is disabled** — requests are not rate-checked
-- **Inference still works** — the gateway continues serving AI requests normally
+- **Caching is disabled**: all requests go directly to the inference engine
+- **Rate limiting is disabled**: requests are not rate-checked
+- **Inference still works**: the gateway continues serving AI requests normally
 
 When Redis comes back, reconnection is automatic on the next container restart.
 </details>
@@ -1400,18 +1400,18 @@ When Redis comes back, reconnection is automatic on the next container restart.
 <summary><b>How do I scale this horizontally?</b></summary>
 
 The current MVP runs as a single-node stack. For horizontal scaling:
-1. **Multiple gateway replicas** — the gateway is stateless (all state is in Redis); run N replicas behind a load balancer
-2. **Shared Redis** — all replicas point to the same Redis instance (cache and rate limits are consistent across replicas)
-3. **Shared model volume** — all llama.cpp containers mount the same model directory read-only
+1. **Multiple gateway replicas**: the gateway is stateless (all state is in Redis); run N replicas behind a load balancer
+2. **Shared Redis**: all replicas point to the same Redis instance (cache and rate limits are consistent across replicas)
+3. **Shared model volume**: all llama.cpp containers mount the same model directory read-only
 4. Phase 2's async request queue will support multiple engine replicas with a dispatcher
 </details>
 
 <details>
 <summary><b>Is this HIPAA/GDPR compliant?</b></summary>
 
-**Technically:** This server processes all data locally — no external API calls, no telemetry, no data transmission. The data never leaves the machine it runs on.
+**Technically:** This server processes all data locally; no external API calls, no telemetry, no data transmission. The data never leaves the machine it runs on.
 
-**Legally:** HIPAA/GDPR compliance depends on your broader infrastructure (how the server itself is deployed, who has access, audit logging, encryption at rest, etc.) — not just the software. Consult your compliance team before deploying this in a regulated environment.
+**Legally:** HIPAA/GDPR compliance depends on your broader infrastructure (how the server itself is deployed, who has access, audit logging, encryption at rest, etc.) - not just the software. Consult your compliance team before deploying this in a regulated environment.
 </details>
 
 <details>
@@ -1444,62 +1444,62 @@ Any library that supports a custom `base_url` and follows the OpenAI API schema 
 | Authentication | Yes | No | Optional |
 | Target use case | Production server | Local dev | Local dev |
 
-Ollama and LM Studio are excellent for personal local use. This project is designed as a **production-ready server** — something you'd deploy for a team or in a private cloud, not just on your own laptop.
+Ollama and LM Studio are excellent for personal local use. This project is designed as a **production-ready server**, something you'd deploy for a team or in a private cloud, not just on your own laptop.
 </details>
 
 ---
 
 ## Glossary
 
-**ASGI (Asynchronous Server Gateway Interface)** — The Python web server standard that allows truly async request handling. FastAPI and uvicorn use ASGI. The older standard (WSGI) was synchronous — one request blocked until it completed.
+**ASGI (Asynchronous Server Gateway Interface)**: The Python web server standard that allows truly async request handling. FastAPI and uvicorn use ASGI. The older standard (WSGI) was synchronous; one request blocked until it completed.
 
-**Bearer Token** — An HTTP authentication scheme where the client sends a secret key in the `Authorization` header: `Authorization: Bearer <key>`. "Bearer" means whoever holds (bears) the token is allowed in.
+**Bearer Token**: An HTTP authentication scheme where the client sends a secret key in the `Authorization` header: `Authorization: Bearer <key>`. "Bearer" means whoever holds (bears) the token is allowed in.
 
-**Cosine Similarity** — A measure of how similar two vectors are, ranging from -1 (opposite) to 1 (identical). When comparing sentence embeddings, a score of 0.95 means "these two sentences mean the same thing," while 0.2 means "these sentences are unrelated."
+**Cosine Similarity**: A measure of how similar two vectors are, ranging from -1 (opposite) to 1 (identical). When comparing sentence embeddings, a score of 0.95 means "these two sentences mean the same thing," while 0.2 means "these sentences are unrelated."
 
-**Docker Compose** — A tool for defining and running multi-container Docker applications using a single YAML file (`docker-compose.yml`). `docker compose up` starts all five services in this project.
+**Docker Compose**: A tool for defining and running multi-container Docker applications using a single YAML file (`docker-compose.yml`). `docker compose up` starts all five services in this project.
 
-**Embedding** — A high-dimensional vector (list of numbers) that represents the meaning of a piece of text. The `all-MiniLM-L6-v2` model converts any text into 384 numbers. Similar meanings produce vectors that are geometrically close together.
+**Embedding**: A high-dimensional vector (list of numbers) that represents the meaning of a piece of text. The `all-MiniLM-L6-v2` model converts any text into 384 numbers. Similar meanings produce vectors that are geometrically close together.
 
-**Grafana** — An open-source dashboard and visualization tool. Connects to Prometheus and displays metrics as real-time charts and graphs.
+**Grafana**: An open-source dashboard and visualization tool. Connects to Prometheus and displays metrics as real-time charts and graphs.
 
-**GGUF** — "GPT-Generated Unified Format" — a file format used by llama.cpp to store quantized AI models. Replaces the older GGML format. Files end in `.gguf`.
+**GGUF** - "GPT-Generated Unified Format", a file format used by llama.cpp to store quantized AI models. Replaces the older GGML format. Files end in `.gguf`.
 
-**HTTP 429 Too Many Requests** — The HTTP status code returned when a client exceeds the rate limit. The response includes a `Retry-After` header indicating how many seconds to wait.
+**HTTP 429 Too Many Requests**: The HTTP status code returned when a client exceeds the rate limit. The response includes a `Retry-After` header indicating how many seconds to wait.
 
-**INT4 Quantization** — A compression technique that stores model weights as 4-bit integers instead of 32-bit floats, reducing model size by ~8x with minimal quality loss. "Q4_K_M" in the model filename refers to a specific 4-bit quantization method.
+**INT4 Quantization**: A compression technique that stores model weights as 4-bit integers instead of 32-bit floats, reducing model size by ~8x with minimal quality loss. "Q4_K_M" in the model filename refers to a specific 4-bit quantization method.
 
-**JSON Schema** — A standard for describing the structure of JSON data. Pydantic uses JSON Schema internally to validate request and response bodies.
+**JSON Schema**: A standard for describing the structure of JSON data. Pydantic uses JSON Schema internally to validate request and response bodies.
 
-**lifespan** — FastAPI's mechanism for running code once at startup and once at shutdown (as opposed to on every request). Used here to initialize the engine client, Redis connection, and embedding model.
+**lifespan**: FastAPI's mechanism for running code once at startup and once at shutdown (as opposed to on every request). Used here to initialize the engine client, Redis connection, and embedding model.
 
-**llama.cpp** — An open-source C++ library and server for running quantized LLMs on CPU (and GPU). Developed by Georgi Gerganov. Supports hundreds of model architectures including Mistral, Llama, Phi, and Gemma.
+**llama.cpp**: An open-source C++ library and server for running quantized LLMs on CPU (and GPU). Developed by Georgi Gerganov. Supports hundreds of model architectures including Mistral, Llama, Phi, and Gemma.
 
-**Mistral 7B Instruct** — A 7-billion-parameter open-source language model developed by Mistral AI, fine-tuned to follow instructions. The "7B" refers to the number of parameters; "Instruct" means it's tuned for chat/Q&A tasks.
+**Mistral 7B Instruct**: A 7-billion-parameter open-source language model developed by Mistral AI, fine-tuned to follow instructions. The "7B" refers to the number of parameters; "Instruct" means it's tuned for chat/Q&A tasks.
 
-**Pydantic** — A Python library for data validation using type annotations. Version 2 is used here for all request/response schemas. Invalid data is rejected automatically with descriptive error messages.
+**Pydantic**: A Python library for data validation using type annotations. Version 2 is used here for all request/response schemas. Invalid data is rejected automatically with descriptive error messages.
 
-**Prometheus** — An open-source monitoring system that collects time-series metrics. It "scrapes" (polls) the `/metrics` endpoint on a schedule and stores the values for querying.
+**Prometheus**: An open-source monitoring system that collects time-series metrics. It "scrapes" (polls) the `/metrics` endpoint on a schedule and stores the values for querying.
 
-**Rate Limiting** — Restricting how many requests a client can make in a time window. This project uses a "token bucket" algorithm implemented with Redis to allow 60 requests per minute per API key by default.
+**Rate Limiting**: Restricting how many requests a client can make in a time window. This project uses a "token bucket" algorithm implemented with Redis to allow 60 requests per minute per API key by default.
 
-**Redis** — An open-source in-memory data store. Used here for two purposes: the semantic cache (storing embeddings and responses) and rate limiting state (storing request counts per API key).
+**Redis**: An open-source in-memory data store. Used here for two purposes: the semantic cache (storing embeddings and responses) and rate limiting state (storing request counts per API key).
 
-**Semantic Cache** — A cache that stores AI responses indexed by the *meaning* of the question, not the exact text. Two questions that mean the same thing return the same cached answer.
+**Semantic Cache**: A cache that stores AI responses indexed by the *meaning* of the question, not the exact text. Two questions that mean the same thing return the same cached answer.
 
-**Server-Sent Events (SSE)** — A one-way HTTP streaming protocol where the server pushes data to the client over a long-lived connection. Used here to stream AI-generated tokens as they are produced (`Content-Type: text/event-stream`).
+**Server-Sent Events (SSE)**: A one-way HTTP streaming protocol where the server pushes data to the client over a long-lived connection. Used here to stream AI-generated tokens as they are produced (`Content-Type: text/event-stream`).
 
-**Sliding Window Rate Limiter** — A rate limiting algorithm that counts requests in a rolling time window (e.g., the last 60 seconds), as opposed to a fixed window which resets at clock boundaries. More accurate and fair.
+**Sliding Window Rate Limiter**: A rate limiting algorithm that counts requests in a rolling time window (e.g., the last 60 seconds), as opposed to a fixed window which resets at clock boundaries. More accurate and fair.
 
-**structlog** — A Python logging library that produces structured JSON log lines instead of unstructured text, making logs easier to search and analyze.
+**structlog**: A Python logging library that produces structured JSON log lines instead of unstructured text, making logs easier to search and analyze.
 
-**TTFT (Time to First Token)** — The latency between sending a request and receiving the first token of the response. For streaming responses, this is the most user-perceptible latency measure.
+**TTFT (Time to First Token)**: The latency between sending a request and receiving the first token of the response. For streaming responses, this is the most user-perceptible latency measure.
 
-**Token Bucket** — A rate limiting algorithm that allows bursting up to a maximum rate, analogous to a bucket that fills at a constant rate but can be drained at burst speed.
+**Token Bucket**: A rate limiting algorithm that allows bursting up to a maximum rate, analogous to a bucket that fills at a constant rate but can be drained at burst speed.
 
-**uvicorn** — A fast ASGI web server for Python. Runs the FastAPI application and handles HTTP connections. Named after "unicorn" (fast) + "uv" (libuv, the async I/O library).
+**uvicorn**: A fast ASGI web server for Python. Runs the FastAPI application and handles HTTP connections. Named after "unicorn" (fast) + "uv" (libuv, the async I/O library).
 
-**vLLM** — A high-throughput LLM inference library developed at UC Berkeley. Uses "PagedAttention" for efficient GPU memory management. Planned for Phase 2 as the GPU inference backend.
+**vLLM**: A high-throughput LLM inference library developed at UC Berkeley. Uses "PagedAttention" for efficient GPU memory management. Planned for Phase 2 as the GPU inference backend.
 
 ---
 
@@ -1514,8 +1514,8 @@ Ollama and LM Studio are excellent for personal local use. This project is desig
 
 **Coding rules:**
 - No blocking I/O in request handlers (use `await` for all I/O)
-- No bare `except` — always catch specific exceptions
-- No `print()` — use `structlog`
+- No bare `except`: always catch specific exceptions
+- No `print()`: use `structlog`
 - All config from environment variables via `get_settings()`
 - All responses validated through Pydantic schemas
 
@@ -1523,7 +1523,7 @@ Ollama and LM Studio are excellent for personal local use. This project is desig
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) file for full text.
+MIT License; see [LICENSE](LICENSE) file for full text.
 
 Free to use, modify, and distribute for any purpose including commercial use.
 
@@ -1533,6 +1533,6 @@ Free to use, modify, and distribute for any purpose including commercial use.
 
 **Built with Python 3.11 + FastAPI + llama.cpp + Redis + Prometheus + Grafana**
 
-*Self-hosted AI — no data leaves your machine.*
+*Self-hosted AI: no data leaves your machine.*
 
 </div>
